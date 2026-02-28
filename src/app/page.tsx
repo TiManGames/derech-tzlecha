@@ -4,12 +4,29 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Shelter, Route, RoutePoint } from '@/types';
 import { fetchAllShelters, filterShelters, getShelterColor, getShelterTypeLabel } from '@/lib/shelters';
-import { getWalkingRoutes, scoreAndRankRoutes, geocodeAddress, reverseGeocode } from '@/lib/routing';
+import { getWalkingRoutes, scoreAndRankRoutes, geocodeAddress, reverseGeocode, getAddressSuggestions, AddressSuggestion } from '@/lib/routing';
 import { ShelterSpatialIndex } from '@/lib/spatial';
 
 // Tel Aviv center coordinates
 const TEL_AVIV_CENTER: [number, number] = [34.7818, 32.0853];
 const DEFAULT_ZOOM = 13;
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function Home() {
   // Map state
@@ -29,6 +46,18 @@ export default function Home() {
   const [destinationInput, setDestinationInput] = useState('');
   const [origin, setOrigin] = useState<RoutePoint | null>(null);
   const [destination, setDestination] = useState<RoutePoint | null>(null);
+
+  // Autocomplete state
+  const [originSuggestions, setOriginSuggestions] = useState<AddressSuggestion[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([]);
+  const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+  const [originFocused, setOriginFocused] = useState(false);
+  const [destFocused, setDestFocused] = useState(false);
+
+  // Debounced inputs for autocomplete
+  const debouncedOriginInput = useDebounce(originInput, 300);
+  const debouncedDestInput = useDebounce(destinationInput, 300);
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
@@ -57,6 +86,36 @@ export default function Home() {
   useEffect(() => {
     destinationRef.current = destination;
   }, [destination]);
+
+  // Fetch origin suggestions
+  useEffect(() => {
+    async function fetchSuggestions() {
+      if (debouncedOriginInput && originFocused && !origin) {
+        const suggestions = await getAddressSuggestions(debouncedOriginInput);
+        setOriginSuggestions(suggestions);
+        setShowOriginSuggestions(suggestions.length > 0);
+      } else {
+        setOriginSuggestions([]);
+        setShowOriginSuggestions(false);
+      }
+    }
+    fetchSuggestions();
+  }, [debouncedOriginInput, originFocused, origin]);
+
+  // Fetch destination suggestions
+  useEffect(() => {
+    async function fetchSuggestions() {
+      if (debouncedDestInput && destFocused && !destination) {
+        const suggestions = await getAddressSuggestions(debouncedDestInput);
+        setDestSuggestions(suggestions);
+        setShowDestSuggestions(suggestions.length > 0);
+      } else {
+        setDestSuggestions([]);
+        setShowDestSuggestions(false);
+      }
+    }
+    fetchSuggestions();
+  }, [debouncedDestInput, destFocused, destination]);
 
   // Initialize map
   useEffect(() => {
@@ -91,14 +150,14 @@ export default function Home() {
       // Use refs to get current state values
       if (!originRef.current) {
         const address = await reverseGeocode(lat, lng);
-        const shortAddress = address.split(',')[0];
         setOrigin({ lat, lon: lng, address });
-        setOriginInput(shortAddress);
+        setOriginInput(address);
+        setShowOriginSuggestions(false);
       } else if (!destinationRef.current) {
         const address = await reverseGeocode(lat, lng);
-        const shortAddress = address.split(',')[0];
         setDestination({ lat, lon: lng, address });
-        setDestinationInput(shortAddress);
+        setDestinationInput(address);
+        setShowDestSuggestions(false);
       }
     });
 
@@ -293,7 +352,45 @@ export default function Home() {
     }
   };
 
-  // Geocode origin address
+  // Select origin suggestion
+  const handleSelectOriginSuggestion = (suggestion: AddressSuggestion) => {
+    setOrigin({ lat: suggestion.lat, lon: suggestion.lon, address: suggestion.display });
+    setOriginInput(suggestion.display);
+    setShowOriginSuggestions(false);
+    if (map.current) {
+      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15 });
+    }
+  };
+
+  // Select destination suggestion
+  const handleSelectDestSuggestion = (suggestion: AddressSuggestion) => {
+    setDestination({ lat: suggestion.lat, lon: suggestion.lon, address: suggestion.display });
+    setDestinationInput(suggestion.display);
+    setShowDestSuggestions(false);
+    if (map.current) {
+      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15 });
+    }
+  };
+
+  // Handle origin input change
+  const handleOriginInputChange = (value: string) => {
+    setOriginInput(value);
+    // Clear the selected origin when user starts typing again
+    if (origin) {
+      setOrigin(null);
+    }
+  };
+
+  // Handle destination input change
+  const handleDestInputChange = (value: string) => {
+    setDestinationInput(value);
+    // Clear the selected destination when user starts typing again
+    if (destination) {
+      setDestination(null);
+    }
+  };
+
+  // Geocode origin address (fallback for Enter key)
   const handleOriginSearch = async () => {
     if (!originInput.trim()) return;
 
@@ -301,6 +398,7 @@ export default function Home() {
       const result = await geocodeAddress(originInput);
       if (result) {
         setOrigin(result);
+        setShowOriginSuggestions(false);
         if (map.current) {
           map.current.flyTo({ center: [result.lon, result.lat], zoom: 15 });
         }
@@ -310,7 +408,7 @@ export default function Home() {
     }
   };
 
-  // Geocode destination address
+  // Geocode destination address (fallback for Enter key)
   const handleDestinationSearch = async () => {
     if (!destinationInput.trim()) return;
 
@@ -318,6 +416,7 @@ export default function Home() {
       const result = await geocodeAddress(destinationInput);
       if (result) {
         setDestination(result);
+        setShowDestSuggestions(false);
         if (map.current) {
           map.current.flyTo({ center: [result.lon, result.lat], zoom: 15 });
         }
@@ -335,6 +434,8 @@ export default function Home() {
     setDestinationInput('');
     setRoutes([]);
     setRouteError(null);
+    setShowOriginSuggestions(false);
+    setShowDestSuggestions(false);
   };
 
   // Get user location
@@ -349,7 +450,7 @@ export default function Home() {
         const { latitude, longitude } = position.coords;
         const address = await reverseGeocode(latitude, longitude);
         setOrigin({ lat: latitude, lon: longitude, address });
-        setOriginInput(address.split(',')[0]);
+        setOriginInput(address);
         
         if (map.current) {
           map.current.flyTo({ center: [longitude, latitude], zoom: 15 });
@@ -413,26 +514,72 @@ export default function Home() {
             <>
               <div className="form-group">
                 <label className="form-label">נקודת התחלה</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="הקלד כתובת או לחץ על המפה"
-                  value={originInput}
-                  onChange={(e) => setOriginInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleOriginSearch()}
-                />
+                <div className="autocomplete-container">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="הקלד כתובת או לחץ על המפה"
+                    value={originInput}
+                    onChange={(e) => handleOriginInputChange(e.target.value)}
+                    onFocus={() => setOriginFocused(true)}
+                    onBlur={() => {
+                      // Delay hiding to allow click on suggestion
+                      setTimeout(() => {
+                        setOriginFocused(false);
+                        setShowOriginSuggestions(false);
+                      }, 200);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleOriginSearch()}
+                  />
+                  {showOriginSuggestions && originSuggestions.length > 0 && (
+                    <div className="autocomplete-dropdown">
+                      {originSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="autocomplete-item"
+                          onClick={() => handleSelectOriginSuggestion(suggestion)}
+                        >
+                          {suggestion.display}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="form-group">
                 <label className="form-label">יעד</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="הקלד כתובת או לחץ על המפה"
-                  value={destinationInput}
-                  onChange={(e) => setDestinationInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleDestinationSearch()}
-                />
+                <div className="autocomplete-container">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="הקלד כתובת או לחץ על המפה"
+                    value={destinationInput}
+                    onChange={(e) => handleDestInputChange(e.target.value)}
+                    onFocus={() => setDestFocused(true)}
+                    onBlur={() => {
+                      // Delay hiding to allow click on suggestion
+                      setTimeout(() => {
+                        setDestFocused(false);
+                        setShowDestSuggestions(false);
+                      }, 200);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleDestinationSearch()}
+                  />
+                  {showDestSuggestions && destSuggestions.length > 0 && (
+                    <div className="autocomplete-dropdown">
+                      {destSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="autocomplete-item"
+                          onClick={() => handleSelectDestSuggestion(suggestion)}
+                        >
+                          {suggestion.display}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Safety slider */}
@@ -553,7 +700,7 @@ export default function Home() {
                           </span>
                         </div>
                         <div className="metric">
-                          <span className="metric-label">מקלטים בדרך</span>
+                          <span className="metric-label">מקלטים קרובים בדרך</span>
                           <span className="metric-value">{route.metrics.sheltersNearRoute}</span>
                         </div>
                         <div className="metric">

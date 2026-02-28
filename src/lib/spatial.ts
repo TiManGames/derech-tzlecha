@@ -36,7 +36,7 @@ export class ShelterSpatialIndex {
    */
   getNearestShelter(lat: number, lon: number): Shelter | null {
     // Search in expanding radius until we find something
-    const searchRadii = [0.001, 0.005, 0.01, 0.05, 0.1]; // degrees (~100m to ~10km)
+    const searchRadii = [0.001, 0.002, 0.003]; // degrees (~100m to ~300m walking distance)
     
     for (const radius of searchRadii) {
       const candidates = this.tree.search({

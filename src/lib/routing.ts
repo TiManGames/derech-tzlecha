@@ -237,6 +237,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
   url.searchParams.set('lat', lat.toString());
   url.searchParams.set('lon', lon.toString());
   url.searchParams.set('format', 'json');
+  url.searchParams.set('addressdetails', '1');
 
   try {
     const response = await fetch(url.toString(), {
@@ -250,9 +251,149 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     }
 
     const result = await response.json();
+    
+    // Format address in a readable way for Hebrew users
+    if (result.address) {
+      const parts: string[] = [];
+      const addr = result.address;
+      
+      // Street and house number
+      if (addr.road) {
+        if (addr.house_number) {
+          parts.push(`${addr.road} ${addr.house_number}`);
+        } else {
+          parts.push(addr.road);
+        }
+      }
+      
+      // Neighborhood or suburb
+      if (addr.neighbourhood) {
+        parts.push(addr.neighbourhood);
+      } else if (addr.suburb) {
+        parts.push(addr.suburb);
+      }
+      
+      // City
+      if (addr.city) {
+        parts.push(addr.city);
+      } else if (addr.town) {
+        parts.push(addr.town);
+      } else if (addr.village) {
+        parts.push(addr.village);
+      }
+      
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
+    }
+    
     return result.display_name || 'מיקום לא ידוע';
   } catch (error) {
     console.error('Reverse geocoding error:', error);
     return 'מיקום לא ידוע';
+  }
+}
+
+/**
+ * Address suggestion for autocomplete
+ */
+export interface AddressSuggestion {
+  display: string;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Get address autocomplete suggestions using Nominatim API
+ * Nominatim has good coverage for Israeli addresses and supports Hebrew
+ */
+export async function getAddressSuggestions(query: string): Promise<AddressSuggestion[]> {
+  if (!query || query.length < 2) {
+    return [];
+  }
+
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', query);
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('limit', '5');
+  url.searchParams.set('addressdetails', '1');
+  // Bias results to Tel Aviv area (viewbox: west, north, east, south)
+  url.searchParams.set('viewbox', '34.65,32.15,34.90,31.95');
+  url.searchParams.set('bounded', '0'); // Prefer but don't strictly limit to viewbox
+  url.searchParams.set('countrycodes', 'il'); // Limit to Israel
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        'User-Agent': 'DerechTzlecha/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nominatim API error: ${response.status}`);
+    }
+
+    const results = await response.json();
+    
+    return results.map((result: {
+      lat: string;
+      lon: string;
+      display_name: string;
+      address?: {
+        road?: string;
+        house_number?: string;
+        neighbourhood?: string;
+        suburb?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+      };
+    }) => {
+      // Format a cleaner display string
+      let display = result.display_name;
+      
+      if (result.address) {
+        const parts: string[] = [];
+        const addr = result.address;
+        
+        // Street and house number
+        if (addr.road) {
+          if (addr.house_number) {
+            parts.push(`${addr.road} ${addr.house_number}`);
+          } else {
+            parts.push(addr.road);
+          }
+        }
+        
+        // Neighborhood or suburb
+        if (addr.neighbourhood) {
+          parts.push(addr.neighbourhood);
+        } else if (addr.suburb) {
+          parts.push(addr.suburb);
+        }
+        
+        // City
+        if (addr.city) {
+          parts.push(addr.city);
+        } else if (addr.town) {
+          parts.push(addr.town);
+        } else if (addr.village) {
+          parts.push(addr.village);
+        }
+        
+        if (parts.length > 0) {
+          display = parts.join(', ');
+        }
+      }
+      
+      return {
+        display,
+        lat: parseFloat(result.lat),
+        lon: parseFloat(result.lon)
+      };
+    });
+  } catch (error) {
+    console.error('Autocomplete error:', error);
+    return [];
   }
 }
