@@ -683,9 +683,22 @@ export default function Home() {
                         <span className="metric-label">זמן הליכה מקס׳ למקלט</span>
                         <span className="metric-value">
                           {(() => {
+                            const maxGap = safestRoute.metrics.maxGapToShelter;
+                            
+                            // Handle Infinity or no shelters case
+                            if (!isFinite(maxGap) || safestRoute.metrics.sheltersNearRoute === 0) {
+                              return 'אין מקלט בטווח בחלק מהדרך או בכולה';
+                            }
+                            
                             // Convert distance to time (walking speed ~1.4 m/s = 5 km/h)
-                            const seconds = Math.round(safestRoute.metrics.maxGapToShelter / 1.4);
+                            const seconds = Math.round(maxGap / 1.4);
                             const minutes = Math.floor(seconds / 60);
+                            
+                            // If more than 5 minutes, show warning
+                            if (minutes >= 5) {
+                              return 'ארוך מאוד (+5 דקות)';
+                            }
+                            
                             const remainingSeconds = seconds % 60;
                             if (minutes === 0) {
                               return `${remainingSeconds} שנ׳`;
