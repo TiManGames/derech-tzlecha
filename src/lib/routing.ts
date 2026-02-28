@@ -111,7 +111,7 @@ export function scoreAndRankRoutes(
       spatialIndex
     );
 
-    const nearbyShelters = spatialIndex.getSheltersNearRoute(geometry, 200);
+    const nearbyShelters = spatialIndex.getSheltersNearRoute(geometry, 150);
 
     return {
       geometry,

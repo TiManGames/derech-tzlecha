@@ -192,7 +192,7 @@ export default function Home() {
     loadShelters();
   }, []);
 
-  // Update shelter markers when shelters or filters change
+  // Update shelter markers when shelters, filters, or route changes
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
@@ -203,11 +203,25 @@ export default function Home() {
     // Filter shelters
     const filteredShelters = filterShelters(shelters, filters);
 
+    // Get IDs of shelters near the route (if route exists)
+    const nearbyShelterIds = new Set<string>(
+      safestRoute?.nearbyShelters?.map(s => s.id) || []
+    );
+
     // Add markers for filtered shelters
     filteredShelters.forEach(shelter => {
       const el = document.createElement('div');
       el.className = 'shelter-marker';
       el.style.backgroundColor = getShelterColor(shelter.type);
+      
+      // Check if this shelter is near the route
+      const isNearRoute = nearbyShelterIds.has(shelter.id);
+      if (isNearRoute) {
+        el.classList.add('near-route');
+      } else if (safestRoute) {
+        // If there's a route but this shelter is not near it, fade it
+        el.classList.add('faded');
+      }
       
       // Add wheelchair icon for accessible shelters
       if (shelter.isAccessible) {
@@ -222,13 +236,14 @@ export default function Home() {
             <div class="popup-title">${getShelterTypeLabel(shelter.type)}</div>
             <div class="popup-address">${shelter.address}</div>
             ${shelter.isAccessible ? '<span class="popup-type">♿ נגיש</span>' : ''}
+            ${isNearRoute ? '<span class="popup-type near-route-badge">📍 על המסלול</span>' : ''}
           `)
         )
         .addTo(map.current!);
 
       markersRef.current.push(marker);
     });
-  }, [shelters, filters, mapReady]);
+  }, [shelters, filters, mapReady, safestRoute]);
 
   // Update origin marker
   useEffect(() => {
