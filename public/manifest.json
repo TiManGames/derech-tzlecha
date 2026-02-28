@@ -1,0 +1,24 @@
+{
+  "name": "דרך צלחה",
+  "short_name": "דרך צלחה",
+  "description": "מצא מסלול הליכה בטוח עם מקלטים ציבוריים בתל אביב",
+  "start_url": "/derech-tzlecha/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/derech-tzlecha/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/derech-tzlecha/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "lang": "he",
+  "dir": "rtl"
+}
