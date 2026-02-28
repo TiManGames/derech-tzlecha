@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Shelter, Route, RoutePoint } from '@/types';
 import { fetchAllShelters, filterShelters, getShelterColor, getShelterTypeLabel } from '@/lib/shelters';
@@ -59,12 +59,10 @@ export default function Home() {
   const debouncedOriginInput = useDebounce(originInput, 300);
   const debouncedDestInput = useDebounce(destinationInput, 300);
 
-  const [routes, setRoutes] = useState<Route[]>([]);
-  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  // Route state - only store the safest route
+  const [safestRoute, setSafestRoute] = useState<Route | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-
-  const [safetyWeight, setSafetyWeight] = useState(0.5);
 
   const [filters, setFilters] = useState({
     showPublicShelters: true,
@@ -273,15 +271,13 @@ export default function Home() {
       map.current.removeSource('route');
     }
 
-    if (routes.length > 0 && routes[selectedRouteIndex]) {
-      const route = routes[selectedRouteIndex];
-
+    if (safestRoute) {
       map.current.addSource('route', {
         type: 'geojson',
         data: {
           type: 'Feature',
           properties: {},
-          geometry: route.geometry,
+          geometry: safestRoute.geometry,
         },
       });
 
@@ -315,7 +311,7 @@ export default function Home() {
       });
 
       // Fit map to route bounds
-      const coordinates = route.geometry.coordinates as [number, number][];
+      const coordinates = safestRoute.geometry.coordinates as [number, number][];
       const bounds = coordinates.reduce(
         (bounds, coord) => bounds.extend(coord as [number, number]),
         new maplibregl.LngLatBounds(coordinates[0], coordinates[0])
@@ -323,15 +319,15 @@ export default function Home() {
 
       map.current.fitBounds(bounds, { padding: 100 });
     }
-  }, [routes, selectedRouteIndex, mapReady]);
+  }, [safestRoute, mapReady]);
 
-  // Search for route
+  // Search for the safest route
   const handleSearch = async () => {
     if (!origin || !destination || !spatialIndex) return;
 
     setRouteLoading(true);
     setRouteError(null);
-    setRoutes([]);
+    setSafestRoute(null);
 
     try {
       const orsRoutes = await getWalkingRoutes(origin, destination);
@@ -341,9 +337,11 @@ export default function Home() {
         return;
       }
 
-      const scoredRoutes = scoreAndRankRoutes(orsRoutes, spatialIndex, safetyWeight);
-      setRoutes(scoredRoutes);
-      setSelectedRouteIndex(0);
+      // Use maximum safety weight (1.0) to get the safest route
+      const scoredRoutes = scoreAndRankRoutes(orsRoutes, spatialIndex, 1.0);
+      
+      // Take only the safest route (first one after sorting)
+      setSafestRoute(scoredRoutes[0]);
     } catch (error) {
       console.error('Route search failed:', error);
       setRouteError('שגיאה בחיפוש מסלול. נסה שוב.');
@@ -432,7 +430,7 @@ export default function Home() {
     setDestination(null);
     setOriginInput('');
     setDestinationInput('');
-    setRoutes([]);
+    setSafestRoute(null);
     setRouteError(null);
     setShowOriginSuggestions(false);
     setShowDestSuggestions(false);
@@ -461,20 +459,6 @@ export default function Home() {
         alert('לא הצלחנו לקבל את המיקום שלך');
       }
     );
-  };
-
-  // Get safety badge class
-  const getSafetyBadgeClass = (score: number): string => {
-    if (score >= 70) return 'safe';
-    if (score >= 40) return 'moderate';
-    return 'risky';
-  };
-
-  // Get safety badge text
-  const getSafetyBadgeText = (score: number): string => {
-    if (score >= 70) return 'בטוח';
-    if (score >= 40) return 'בינוני';
-    return 'פחות בטוח';
   };
 
   return (
@@ -582,29 +566,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Safety slider */}
-              <div className="slider-container">
-                <div className="slider-header">
-                  <span className="slider-label">איזון בטיחות/מהירות</span>
-                  <span className="slider-value">
-                    {safetyWeight < 0.3 ? 'מהיר' : safetyWeight > 0.7 ? 'בטוח' : 'מאוזן'}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  className="slider"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={safetyWeight}
-                  onChange={(e) => setSafetyWeight(parseFloat(e.target.value))}
-                />
-                <div className="slider-labels">
-                  <span>מהיר יותר</span>
-                  <span>בטוח יותר</span>
-                </div>
-              </div>
-
               {/* Filters */}
               <div className="form-group">
                 <label className="form-label">סינון מקלטים</label>
@@ -655,7 +616,7 @@ export default function Home() {
                       מחפש...
                     </>
                   ) : (
-                    '🔍 חפש מסלול'
+                    '🔍 מצא מסלול בטוח'
                   )}
                 </button>
                 {(origin || destination) && (
@@ -665,53 +626,47 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Route results */}
-              {routes.length > 0 && (
+              {/* Route result - single safest route */}
+              {safestRoute && (
                 <div className="route-results">
                   <h3 style={{ fontSize: '0.875rem', marginBottom: '12px' }}>
-                    נמצאו {routes.length} מסלולים
+                    🛡️ המסלול הבטוח ביותר
                   </h3>
-                  {routes.map((route, index) => (
-                    <div
-                      key={index}
-                      className={`route-card ${index === selectedRouteIndex ? 'selected' : ''}`}
-                      onClick={() => setSelectedRouteIndex(index)}
-                    >
-                      <div className="route-header">
-                        <span className="route-title">
-                          מסלול {index + 1}
-                          {index === 0 && ' (מומלץ)'}
-                        </span>
-                        <span className={`route-badge ${getSafetyBadgeClass(route.metrics.safetyScore)}`}>
-                          {getSafetyBadgeText(route.metrics.safetyScore)}
+                  <div className="route-card selected">
+                    <div className="route-metrics">
+                      <div className="metric">
+                        <span className="metric-label">מרחק</span>
+                        <span className="metric-value">
+                          {safestRoute.metrics.distanceKm.toFixed(1)} ק״מ
                         </span>
                       </div>
-                      <div className="route-metrics">
-                        <div className="metric">
-                          <span className="metric-label">מרחק</span>
-                          <span className="metric-value">
-                            {route.metrics.distanceKm.toFixed(1)} ק״מ
-                          </span>
-                        </div>
-                        <div className="metric">
-                          <span className="metric-label">זמן</span>
-                          <span className="metric-value">
-                            {Math.round(route.metrics.durationMinutes)} דק׳
-                          </span>
-                        </div>
-                        <div className="metric">
-                          <span className="metric-label">מקלטים קרובים בדרך</span>
-                          <span className="metric-value">{route.metrics.sheltersNearRoute}</span>
-                        </div>
-                        <div className="metric">
-                          <span className="metric-label">מרחק מקס׳ ממקלט</span>
-                          <span className="metric-value">
-                            {Math.round(route.metrics.maxGapToShelter)} מ׳
-                          </span>
-                        </div>
+                      <div className="metric">
+                        <span className="metric-label">זמן הליכה</span>
+                        <span className="metric-value">
+                          {Math.round(safestRoute.metrics.durationMinutes)} דק׳
+                        </span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">מקלטים בדרך</span>
+                        <span className="metric-value">{safestRoute.metrics.sheltersNearRoute}</span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">זמן הליכה מקס׳ למקלט</span>
+                        <span className="metric-value">
+                          {(() => {
+                            // Convert distance to time (walking speed ~1.4 m/s = 5 km/h)
+                            const seconds = Math.round(safestRoute.metrics.maxGapToShelter / 1.4);
+                            const minutes = Math.floor(seconds / 60);
+                            const remainingSeconds = seconds % 60;
+                            if (minutes === 0) {
+                              return `${remainingSeconds} שנ׳`;
+                            }
+                            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')} דק׳`;
+                          })()}
+                        </span>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
 
