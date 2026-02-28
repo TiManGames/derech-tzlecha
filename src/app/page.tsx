@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { Shelter, Route, RoutePoint } from '@/types';
+
+// Set RTL text plugin for proper Hebrew rendering on the map
+if (typeof window !== 'undefined') {
+  maplibregl.setRTLTextPlugin(
+    'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+    true
+  );
+}
 import { fetchAllShelters, filterShelters, getShelterColor, getShelterTypeLabel } from '@/lib/shelters';
 import { getWalkingRoutes, scoreAndRankRoutes, geocodeAddress, reverseGeocode, getAddressSuggestions, AddressSuggestion } from '@/lib/routing';
 import { ShelterSpatialIndex } from '@/lib/spatial';
@@ -71,12 +79,6 @@ export default function Home() {
   });
 
   const [mapReady, setMapReady] = useState(false);
-  const [rtlPluginLoaded, setRtlPluginLoaded] = useState(false);
-
-  // Set RTL plugin loaded immediately (not needed for English labels)
-  useEffect(() => {
-    setRtlPluginLoaded(true);
-  }, []);
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -121,13 +123,13 @@ export default function Home() {
     fetchSuggestions();
   }, [debouncedDestInput, destFocused, destination]);
 
-  // Initialize map (wait for RTL plugin to load first)
+  // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current || !rtlPluginLoaded) return;
+    if (!mapContainer.current || map.current) return;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'https://tiles.stadiamaps.com/styles/alidade_smooth.json',
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
       center: TEL_AVIV_CENTER,
       zoom: DEFAULT_ZOOM,
       attributionControl: false,
@@ -169,7 +171,7 @@ export default function Home() {
       map.current?.remove();
       map.current = null;
     };
-  }, [rtlPluginLoaded]);
+  }, []);
 
   // Fetch shelters on mount
   useEffect(() => {
@@ -206,6 +208,12 @@ export default function Home() {
       const el = document.createElement('div');
       el.className = 'shelter-marker';
       el.style.backgroundColor = getShelterColor(shelter.type);
+      
+      // Add wheelchair icon for accessible shelters
+      if (shelter.isAccessible) {
+        el.innerHTML = '♿';
+        el.classList.add('accessible');
+      }
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([shelter.lon, shelter.lat])

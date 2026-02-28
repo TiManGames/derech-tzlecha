@@ -125,16 +125,13 @@ export function getShelterTypeLabel(type: ShelterType): string {
 
 /**
  * Get marker color for shelter type
+ * Blue for regular shelters, purple for parking shelters
  */
 export function getShelterColor(type: ShelterType): string {
-  const colors: Record<ShelterType, string> = {
-    public_shelter: '#2563eb',      // blue
-    accessible_shelter: '#16a34a',  // green
-    parking_shelter: '#9333ea',     // purple
-    stairwell: '#ea580c',           // orange
-    other: '#6b7280',               // gray
-  };
-  return colors[type];
+  if (type === 'parking_shelter') {
+    return '#9333ea'; // purple for parking shelters
+  }
+  return '#2563eb'; // blue for all other shelters
 }
 
 /**
