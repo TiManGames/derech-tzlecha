@@ -45,6 +45,19 @@ export default function Home() {
 
   const [mapReady, setMapReady] = useState(false);
 
+  // Use refs to track current state for map click handler
+  const originRef = useRef<RoutePoint | null>(null);
+  const destinationRef = useRef<RoutePoint | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    originRef.current = origin;
+  }, [origin]);
+
+  useEffect(() => {
+    destinationRef.current = destination;
+  }, [destination]);
+
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -74,7 +87,19 @@ export default function Home() {
     // Handle map clicks for setting origin/destination
     map.current.on('click', async (e) => {
       const { lng, lat } = e.lngLat;
-      handleMapClick(lat, lng);
+      
+      // Use refs to get current state values
+      if (!originRef.current) {
+        const address = await reverseGeocode(lat, lng);
+        const shortAddress = address.split(',')[0];
+        setOrigin({ lat, lon: lng, address });
+        setOriginInput(shortAddress);
+      } else if (!destinationRef.current) {
+        const address = await reverseGeocode(lat, lng);
+        const shortAddress = address.split(',')[0];
+        setDestination({ lat, lon: lng, address });
+        setDestinationInput(shortAddress);
+      }
     });
 
     return () => {
@@ -82,21 +107,6 @@ export default function Home() {
       map.current = null;
     };
   }, []);
-
-  // Handle map click
-  const handleMapClick = async (lat: number, lng: number) => {
-    if (!origin) {
-      const address = await reverseGeocode(lat, lng);
-      const shortAddress = address.split(',')[0];
-      setOrigin({ lat, lon: lng, address });
-      setOriginInput(shortAddress);
-    } else if (!destination) {
-      const address = await reverseGeocode(lat, lng);
-      const shortAddress = address.split(',')[0];
-      setDestination({ lat, lon: lng, address });
-      setDestinationInput(shortAddress);
-    }
-  };
 
   // Fetch shelters on mount
   useEffect(() => {

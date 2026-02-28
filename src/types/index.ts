@@ -20,18 +20,47 @@ export type ShelterType =
 
 export interface ShelterFeature {
   type: 'Feature';
+  id?: number;
   geometry: {
     type: 'Point';
     coordinates: [number, number]; // [lon, lat]
   };
   properties: {
-    OBJECTID: number;
-    address?: string;
-    sug_miklat?: string;
-    nagish?: string;
-    is_open?: string;
+    OBJECTID?: number;
+    oid_mitkan?: number;
+    ms_miklat?: number;
+    k_sug?: number;
+    t_sug?: string;
+    k_rechov?: number;
+    shem_recho?: string;
+    ms_bait?: number;
+    knisa?: string;
+    Full_Address?: string;
+    shem_rechov_eng?: string;
+    shetach_mr?: number;
+    k_sinon?: number;
+    t_sinon?: string;
+    hearot?: string;
+    h_sug?: string;
+    x_coord?: number;
+    y_coord?: number;
+    lon?: number;
+    lat?: number;
+    shem_baalim?: string;
+    shem?: string;
+    pail?: string;
+    from_time?: string;
+    to_time?: string;
     opening_times?: string;
-    capacity?: number;
+    url_tik?: string;
+    telephone_henion?: string;
+    manager_name?: string;
+    email?: string;
+    celolar?: string;
+    is_open?: string;
+    UniqueId?: string;
+    date_import?: string;
+    miklat_mungash?: string;
     [key: string]: unknown;
   };
 }

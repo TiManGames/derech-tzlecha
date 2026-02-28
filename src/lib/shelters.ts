@@ -56,16 +56,23 @@ function featureToShelter(feature: ShelterFeature): Shelter {
   const props = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
 
+  // Field names from actual API response:
+  // oid_mitkan, ms_miklat, k_sug, t_sug, k_rechov, shem_recho, ms_bait, knisa,
+  // Full_Address, shem_rechov_eng, shetach_mr, k_sinon, t_sinon, hearot,
+  // h_sug, x_coord, y_coord, lon, lat, shem_baalim, shem, pail,
+  // from_time, to_time, opening_times, url_tik, telephone_henion,
+  // manager_name, email, celolar, is_open, UniqueId, date_import, miklat_mungash
+
   return {
-    id: props.OBJECTID.toString(),
-    lat,
-    lon,
-    address: props.address || 'כתובת לא ידועה',
-    type: parseShelterType(props.sug_miklat),
-    isAccessible: parseAccessibility(props.nagish),
+    id: (props.oid_mitkan || props.OBJECTID || feature.id || Math.random()).toString(),
+    lat: props.lat || lat,
+    lon: props.lon || lon,
+    address: props.Full_Address || props.shem_recho || 'כתובת לא ידועה',
+    type: parseShelterType(props.t_sug),
+    isAccessible: parseAccessibility(props.h_sug) || props.miklat_mungash !== null,
     isOpen: props.is_open === 'כן' || props.is_open === 'yes',
     openingTimes: props.opening_times,
-    capacity: props.capacity,
+    capacity: props.shetach_mr,
   };
 }
 
