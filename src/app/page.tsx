@@ -71,6 +71,12 @@ export default function Home() {
   });
 
   const [mapReady, setMapReady] = useState(false);
+  const [rtlPluginLoaded, setRtlPluginLoaded] = useState(false);
+
+  // Set RTL plugin loaded immediately (not needed for English labels)
+  useEffect(() => {
+    setRtlPluginLoaded(true);
+  }, []);
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -115,13 +121,13 @@ export default function Home() {
     fetchSuggestions();
   }, [debouncedDestInput, destFocused, destination]);
 
-  // Initialize map
+  // Initialize map (wait for RTL plugin to load first)
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || !rtlPluginLoaded) return;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      style: 'https://tiles.stadiamaps.com/styles/alidade_smooth.json',
       center: TEL_AVIV_CENTER,
       zoom: DEFAULT_ZOOM,
       attributionControl: false,
@@ -163,7 +169,7 @@ export default function Home() {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [rtlPluginLoaded]);
 
   // Fetch shelters on mount
   useEffect(() => {
