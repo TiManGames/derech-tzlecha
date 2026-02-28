@@ -3,21 +3,41 @@ import * as turf from '@turf/turf';
 import { ShelterSpatialIndex } from './spatial';
 
 const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjBkM2Q2YThjODYxZDQ4YTg4ZDM0ZGIyMDUzZDA1YzNlIiwiaCI6Im11cm11cjY0In0=';
-const ORS_BASE_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking';
+const ORS_BASE_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson';
 
 interface ORSRoute {
   geometry: {
     coordinates: [number, number][];
     type: 'LineString';
   };
+  properties: {
+    summary: {
+      distance: number; // meters
+      duration: number; // seconds
+    };
+    segments: unknown[];
+  };
   summary: {
-    distance: number; // meters
-    duration: number; // seconds
+    distance: number;
+    duration: number;
   };
 }
 
-interface ORSResponse {
-  routes: ORSRoute[];
+interface ORSGeoJSONResponse {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    geometry: {
+      coordinates: [number, number][];
+      type: 'LineString';
+    };
+    properties: {
+      summary: {
+        distance: number;
+        duration: number;
+      };
+    };
+  }>;
 }
 
 /**
@@ -28,8 +48,6 @@ export async function getWalkingRoutes(
   origin: RoutePoint,
   destination: RoutePoint
 ): Promise<ORSRoute[]> {
-  const url = new URL(ORS_BASE_URL);
-  
   const body = {
     coordinates: [
       [origin.lon, origin.lat],
@@ -39,13 +57,11 @@ export async function getWalkingRoutes(
       target_count: 3,
       weight_factor: 1.6,
       share_factor: 0.6
-    },
-    geometry: true,
-    instructions: false
+    }
   };
 
   try {
-    const response = await fetch(url.toString(), {
+    const response = await fetch(ORS_BASE_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -56,11 +72,18 @@ export async function getWalkingRoutes(
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('ORS API error response:', errorText);
       throw new Error(`ORS API error: ${response.status} - ${errorText}`);
     }
 
-    const data: ORSResponse = await response.json();
-    return data.routes || [];
+    const data: ORSGeoJSONResponse = await response.json();
+    
+    // Convert GeoJSON features to our route format
+    return data.features.map(feature => ({
+      geometry: feature.geometry,
+      properties: feature.properties,
+      summary: feature.properties.summary
+    })) as unknown as ORSRoute[];
   } catch (error) {
     console.error('Error fetching routes:', error);
     throw error;
