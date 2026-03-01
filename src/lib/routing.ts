@@ -2,8 +2,8 @@ import { RoutePoint, Route, RouteMetrics, Shelter } from '@/types';
 import * as turf from '@turf/turf';
 import { ShelterSpatialIndex } from './spatial';
 
-const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjBkM2Q2YThjODYxZDQ4YTg4ZDM0ZGIyMDUzZDA1YzNlIiwiaCI6Im11cm11cjY0In0=';
-const ORS_BASE_URL = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson';
+// Use our server-side API route to proxy requests to ORS
+const ROUTE_API_URL = '/api/route';
 
 interface ORSRoute {
   geometry: {
@@ -41,7 +41,7 @@ interface ORSGeoJSONResponse {
 }
 
 /**
- * Get walking routes from OpenRouteService
+ * Get walking routes from OpenRouteService via our server-side API route
  * Requests alternative routes when possible
  */
 export async function getWalkingRoutes(
@@ -61,19 +61,19 @@ export async function getWalkingRoutes(
   };
 
   try {
-    const response = await fetch(ORS_BASE_URL, {
+    // Call our server-side API route which proxies to ORS
+    const response = await fetch(ROUTE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': ORS_API_KEY
       },
       body: JSON.stringify(body)
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ORS API error response:', errorText);
-      throw new Error(`ORS API error: ${response.status} - ${errorText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Route API error:', errorData);
+      throw new Error(`Route API error: ${response.status}`);
     }
 
     const data: ORSGeoJSONResponse = await response.json();
