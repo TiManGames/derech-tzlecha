@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: 'מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים בתל אביב',
   keywords: ['מקלטים', 'תל אביב', 'מסלול בטוח', 'הליכה', 'מיגון'],
   authors: [{ name: 'דרך צלחה' }],
-  manifest: '/manifest.json',
+  manifest: '/derech-tzlecha/manifest.json',
   icons: {
     icon: '/favicon.ico',
   },
