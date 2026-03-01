@@ -751,7 +751,7 @@ export default function Home() {
       <div ref={mapContainer} className="map-container" />
 
       {/* Location button */}
-      <button className="location-btn" onClick={handleGetLocation} title="המיקום שלי">
+      <button className={`location-btn ${isPanelMinimized ? 'panel-minimized' : ''}`} onClick={handleGetLocation} title="המיקום שלי">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
         </svg>
@@ -1028,9 +1028,27 @@ export default function Home() {
                   </a>
                 </div>
               </div>
+
             </>
           )}
         </div>
+
+        {/* Credit - fixed footer */}
+        {!isPanelMinimized && (
+          <div className="panel-footer">
+            <div className="credit">
+              Made by{' '}
+              <a
+                href="https://www.linkedin.com/in/rom-bernheimer-9364b9174/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="credit-link"
+              >
+                Rom Bernheimer
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

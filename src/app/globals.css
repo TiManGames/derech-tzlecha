@@ -458,6 +458,41 @@ body {
   text-decoration: underline;
 }
 
+/* Panel footer - fixed at bottom */
+.panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+/* Credit */
+.credit {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.credit-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.credit-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .panel-footer {
+    padding: 8px 16px;
+  }
+  
+  .credit {
+    font-size: 0.65rem;
+  }
+}
+
 /* Map markers */
 .shelter-marker {
   width: 24px;
@@ -578,7 +613,13 @@ body {
 
 @media (max-width: 768px) {
   .location-btn {
-    bottom: calc(60vh + 16px);
+    bottom: calc(55vh + 16px);
+    transition: bottom 0.3s ease;
+  }
+  
+  /* When panel is minimized, move location button down */
+  .location-btn.panel-minimized {
+    bottom: 80px;
   }
 }
 
