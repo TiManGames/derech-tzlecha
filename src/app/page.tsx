@@ -43,6 +43,7 @@ export default function Home() {
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const originMarkerRef = useRef<maplibregl.Marker | null>(null);
   const destMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const routeResultsRef = useRef<HTMLDivElement>(null);
 
   // App state
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -356,6 +357,16 @@ export default function Home() {
     }
   }, [safestRoute, mapReady]);
 
+  // Auto-scroll to results when route is found (mobile UX)
+  useEffect(() => {
+    if (safestRoute && routeResultsRef.current) {
+      // Small delay to ensure the DOM has updated
+      setTimeout(() => {
+        routeResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [safestRoute]);
+
   // Search for the safest route
   const handleSearch = async () => {
     if (!origin || !destination || !spatialIndex) return;
@@ -512,7 +523,7 @@ export default function Home() {
       <div className="control-panel">
         <div className="panel-header">
           <h1>🛡️ דרך צלחה</h1>
-          <p>מצא מסלול הליכה בטוח עם מקלטים</p>
+          <p>מצא מסלול הליכה בטוח עם מקלטים בתל אביב</p>
         </div>
 
         <div className="panel-content">
@@ -663,7 +674,7 @@ export default function Home() {
 
               {/* Route result - single safest route */}
               {safestRoute && (
-                <div className="route-results">
+                <div className="route-results" ref={routeResultsRef}>
                   <h3 style={{ fontSize: '0.875rem', marginBottom: '12px' }}>
                     🛡️ המסלול הבטוח ביותר
                   </h3>
