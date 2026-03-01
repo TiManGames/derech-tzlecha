@@ -82,6 +82,7 @@ export default function Home() {
 
   // Live location tracking state
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const [userHeading, setUserHeading] = useState<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasInitialCenterRef = useRef(false);
@@ -450,11 +451,16 @@ export default function Home() {
     // Start watching position
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
+        const { latitude, longitude, accuracy, heading } = position.coords;
         
         // Only update location if accuracy is good enough
         if (accuracy <= MAX_ACCURACY_THRESHOLD) {
           setUserLocation({ lat: latitude, lon: longitude, accuracy });
+          
+          // Update heading if available (typically only on mobile when moving)
+          if (heading !== null && !isNaN(heading)) {
+            setUserHeading(heading);
+          }
         } else {
           // If accuracy is poor, clear the location marker
           console.log(`Location accuracy too low: ${accuracy}m (threshold: ${MAX_ACCURACY_THRESHOLD}m)`);
@@ -499,10 +505,17 @@ export default function Home() {
     }
 
     if (userLocation) {
-      // Create the blue pulsing dot marker
+      // Create the blue pulsing dot marker with optional direction cone
       const el = document.createElement('div');
       el.className = 'user-location-marker';
+      
+      // Add direction cone if heading is available
+      const coneHtml = userHeading !== null 
+        ? `<div class="user-location-cone" style="--heading: ${userHeading}deg"></div>`
+        : '';
+      
       el.innerHTML = `
+        ${coneHtml}
         <div class="user-location-pulse"></div>
         <div class="user-location-dot"></div>
       `;
@@ -544,7 +557,7 @@ export default function Home() {
         });
       }
     }
-  }, [userLocation, mapReady]);
+  }, [userLocation, userHeading, mapReady]);
 
   // Search for the safest route
   const handleSearch = async () => {
