@@ -578,14 +578,73 @@ body {
 
 @media (max-width: 768px) {
   .location-btn {
-    bottom: calc(55vh + 16px);
-    transition: bottom 0.3s ease;
+    bottom: calc(60vh + 16px);
+  }
+}
+
+/* SOS Button */
+.sos-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  z-index: 1000;
+  transition: all 0.2s ease;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.sos-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.sos-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.sos-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sos-icon {
+  font-size: 1.25rem;
+}
+
+.sos-text {
+  white-space: nowrap;
+}
+
+.sos-spinner {
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+}
+
+@media (max-width: 768px) {
+  .sos-btn {
+    top: auto;
+    bottom: calc(60vh + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 24px;
+    font-size: 1.1rem;
   }
   
-  /* When panel is minimized, move location button down */
-  .control-panel.minimized ~ .location-btn,
-  body:has(.control-panel.minimized) .location-btn {
-    bottom: 80px;
+  .sos-btn:hover:not(:disabled) {
+    transform: translateX(-50%) translateY(-2px);
   }
 }
 

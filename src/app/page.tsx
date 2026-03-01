@@ -122,6 +122,7 @@ export default function Home() {
 
   const [mapReady, setMapReady] = useState(false);
   const [isPanelMinimized, setIsPanelMinimized] = useState(false);
+  const [sosLoading, setSosLoading] = useState(false);
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -653,6 +654,97 @@ export default function Home() {
     );
   };
 
+  // SOS - Find nearest shelter from current location
+  const handleSOS = async () => {
+    if (!spatialIndex) {
+      alert('המקלטים עדיין נטענים, נסה שוב');
+      return;
+    }
+
+    setSosLoading(true);
+    setRouteError(null);
+    setSafestRoute(null);
+
+    // Helper function to route to nearest shelter
+    const routeToNearestShelter = async (lat: number, lon: number) => {
+      try {
+        // Find nearest shelter
+        const nearestShelter = spatialIndex.getNearestShelter(lat, lon);
+        
+        if (!nearestShelter) {
+          setRouteError('לא נמצא מקלט קרוב. נסה שוב.');
+          setSosLoading(false);
+          return;
+        }
+
+        // Set origin as current location
+        const originAddress = await reverseGeocode(lat, lon);
+        const originPoint: RoutePoint = { lat, lon, address: originAddress };
+        setOrigin(originPoint);
+        setOriginInput(originAddress);
+
+        // Set destination as nearest shelter
+        const destPoint: RoutePoint = {
+          lat: nearestShelter.lat,
+          lon: nearestShelter.lon,
+          address: nearestShelter.address,
+        };
+        setDestination(destPoint);
+        setDestinationInput(nearestShelter.address);
+
+        // Get walking route
+        const orsRoutes = await getWalkingRoutes(originPoint, destPoint);
+        
+        if (orsRoutes.length === 0) {
+          setRouteError('לא נמצא מסלול למקלט. נסה שוב.');
+          setSosLoading(false);
+          return;
+        }
+
+        // Score and set the route
+        const scoredRoutes = scoreAndRankRoutes(orsRoutes, spatialIndex, 1.0);
+        setSafestRoute(scoredRoutes[0]);
+
+        // Expand panel if minimized
+        setIsPanelMinimized(false);
+      } catch (error) {
+        console.error('SOS route failed:', error);
+        setRouteError('שגיאה במציאת מסלול למקלט. נסה שוב.');
+      } finally {
+        setSosLoading(false);
+      }
+    };
+
+    // Use live location if available, otherwise request it
+    if (userLocation) {
+      await routeToNearestShelter(userLocation.lat, userLocation.lon);
+    } else {
+      // Request location
+      if (!navigator.geolocation) {
+        alert('הדפדפן שלך לא תומך במיקום');
+        setSosLoading(false);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          await routeToNearestShelter(latitude, longitude);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          alert('לא הצלחנו לקבל את המיקום שלך. אנא אפשר גישה למיקום.');
+          setSosLoading(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    }
+  };
+
   return (
     <main style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       {/* Map */}
@@ -663,6 +755,23 @@ export default function Home() {
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
         </svg>
+      </button>
+
+      {/* SOS Button - Find nearest shelter */}
+      <button
+        className="sos-btn"
+        onClick={handleSOS}
+        disabled={sosLoading || sheltersLoading}
+        title="מצא מקלט קרוב"
+      >
+        {sosLoading ? (
+          <div className="spinner sos-spinner"></div>
+        ) : (
+          <>
+            <span className="sos-icon">🆘</span>
+            <span className="sos-text">מקלט קרוב</span>
+          </>
+        )}
       </button>
 
       {/* Control Panel */}
