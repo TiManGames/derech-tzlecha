@@ -773,7 +773,10 @@ body {
   height: 80px;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) rotate(calc(var(--heading) - 90deg));
+  /* Heading: 0=North, 90=East, 180=South, 270=West
+     CSS rotate: 0=right, 90=down, 180=left, 270=up
+     Formula: heading - 90 to convert, but maps are flipped so we negate */
+  transform: translate(-50%, -50%) rotate(calc(var(--heading) * -1 + 90deg));
   background: conic-gradient(
     from -30deg,
     transparent 0deg,
