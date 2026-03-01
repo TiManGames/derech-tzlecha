@@ -1,21 +1,35 @@
 ---
 name: shelter-locations
-description: Gives information on how to fetch shelter locations in Tel Aviv with live information, and some guidlines on what is the structure of the data. Use it when you want to know how to get shelter information and how to work with the data and how to poll the dataset. This is only here as a helpful guide.
+description: Gives information on how to fetch shelter locations in Different Cities with live information, and some guidlines on what is the structure of the data. Use it when you want to know how to get shelter information and how to work with the data and how to poll the dataset. This is only here as a helpful guide.
 ---
 
-# How to pull the dataset (GeoJSON)
+# Shelter Locations Dataset
 
-ArcGIS REST “query” supports GeoJSON output and pagination (Result Offset / Result Record Count).
+This skill provides information on how to fetch shelter/protected-space data from multiple cities in Israel.
+
+## Supported Cities
+
+1. **Tel Aviv** - ArcGIS REST API (GeoJSON)
+2. **Jerusalem** - CKAN DataStore API (JSON)
+
+---
+
+# Tel Aviv Shelter Locations Dataset
+
+## How to pull the dataset (GeoJSON)
+
+ArcGIS REST "query" supports GeoJSON output and pagination (Result Offset / Result Record Count).
 Example (client or backend):
 
-## first page
+### first page
 curl 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/IView2/MapServer/592/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson&resultRecordCount=2000&resultOffset=0'
 
-## next page
+### next page
 curl 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/IView2/MapServer/592/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson&resultRecordCount=2000&resultOffset=2000'
 
-# TypeScript interface extracted from the response
+## TypeScript interface extracted from the response
 
+```typescript
 // GeoJSON Point Geometry
 interface PointGeometry {
   type: "Point";
@@ -73,9 +87,137 @@ interface TelAvivSheltersResponse {
   type: "FeatureCollection";
   features: ShelterFeature[];
 }
+```
 
-A few things worth noting:
+### Notes for Tel Aviv data:
+- Nullable fields — contact details (email, celolar, maneger_name, etc.) and ownership info (shem_baalim, shem) can be null
+- Dual coordinate systems — coordinates are available in both WGS84 (lon/lat) and the Israel Transverse Mercator grid (x_coord/y_coord)
+- is_open is a string ("כן"/"לא") rather than a boolean
 
-Nullable fields — contact details (email, celolar, maneger_name, etc.) and ownership info (shem_baalim, shem) can be null
-Dual coordinate systems — coordinates are available in both WGS84 (lon/lat) and the Israel Transverse Mercator grid (x_coord/y_coord)
-is_open is a string ("כן"/"לא") rather than a boolean
+---
+
+# Jerusalem Shelter Locations Dataset
+
+## Data Source
+
+Jerusalem's open-data portal (DataCity) publishes a "Public Shelters / Protected Spaces" dataset via CKAN Data API (DataStore). The dataset is updated to June 2025.
+
+**Licensing:** ODbL (Open Database License)
+
+## API Endpoints
+
+### Basic query (returns JSON)
+```
+https://jerusalem.datacity.org.il/api/3/action/datastore_search?resource_id=f487babc-5bec-45da-93bd-37aab76f8df8&limit=5000
+```
+
+### With pagination (offset parameter)
+```
+https://jerusalem.datacity.org.il/api/3/action/datastore_search?resource_id=f487babc-5bec-45da-93bd-37aab76f8df8&limit=5000&offset=5000
+```
+
+### SQL query (server-side filtering)
+```
+https://jerusalem.datacity.org.il/api/3/action/datastore_search_sql?sql=SELECT%20*%20from%20%22f487babc-5bec-45da-93bd-37aab76f8df8%22%20LIMIT%205
+```
+
+### Alternative resource (CSV-backed)
+```
+https://jerusalem.datacity.org.il/api/3/action/datastore_search?resource_id=db096951-dd8b-4e76-876a-07c34a00cec5&limit=5000
+```
+
+## TypeScript Interface
+
+```typescript
+interface JerusalemShelterRecord {
+  _id: number;                      // Unique record ID
+  neighborhood?: string;            // Neighborhood name (Hebrew)
+  'Shleter Number'?: string;        // Shelter number (note: typo in original data)
+  shelterNumber?: string;           // Alternative field name
+  address?: string;                 // Street address
+  area?: string;                    // Area/region
+  type?: string;                    // Shelter type
+  capacity?: number | string;       // Capacity (may be string or number)
+  operator?: string;                // Operating organization
+  'X-axis coordinates'?: string | number;  // X coordinate (EPSG:2039)
+  'Y axis coordinates'?: string | number;  // Y coordinate (EPSG:2039)
+  xAxisCoordinates?: string | number;      // Alternative field name
+  yAxisCoordinates?: string | number;      // Alternative field name
+  'Address for the map'?: string;   // Display address for mapping
+  addressForMap?: string;           // Alternative field name
+  administration?: string;          // Administrative body
+  category?: string;                // Category classification
+}
+
+interface JerusalemCKANResponse {
+  success: boolean;
+  result: {
+    records: JerusalemShelterRecord[];
+    total: number;
+    _links?: {
+      next?: string;
+    };
+  };
+}
+```
+
+## Important: Coordinate Handling
+
+**Jerusalem coordinates are already in WGS84, but the field names are misleading!**
+
+The API labels the fields as "X-axis coordinates" and "Y axis coordinates", but they actually contain:
+- `"X-axis coordinates"` = **latitude** (e.g., 31.8103973)
+- `"Y axis coordinates"` = **longitude** (e.g., 35.2213932)
+
+**No coordinate transformation is needed** - just swap the field interpretation:
+
+```typescript
+// Jerusalem data has lat/lon already in WGS84, but mislabeled:
+const lat = parseFloat(record['X-axis coordinates']); // X is actually latitude
+const lon = parseFloat(record['Y axis coordinates']); // Y is actually longitude
+```
+
+### Validation
+Validate that coordinates fall within Israel bounds:
+- Latitude: 29° to 34° N
+- Longitude: 34° to 36° E
+
+---
+
+# Unified Shelter Interface
+
+The app uses a unified `Shelter` interface that works with both data sources:
+
+```typescript
+type City = 'tel-aviv' | 'jerusalem';
+
+type ShelterType = 
+  | 'public_shelter'      // מקלט ציבורי
+  | 'accessible_shelter'  // מקלט ציבורי נגיש
+  | 'parking_shelter'     // חניון מחסה לציבור
+  | 'stairwell'          // חדר מדרגות מוגן
+  | 'other';
+
+interface Shelter {
+  id: string;           // Prefixed with 'ta-' or 'jlm-' for source identification
+  lat: number;          // WGS84 latitude
+  lon: number;          // WGS84 longitude
+  address: string;      // Display address
+  type: ShelterType;    // Normalized shelter type
+  isAccessible: boolean;// Accessibility flag
+  isOpen?: boolean;     // Open status (Tel Aviv only)
+  openingTimes?: string;// Opening hours (Tel Aviv only)
+  capacity?: number;    // Capacity (both sources)
+  city: City;           // Source city identifier
+}
+```
+
+---
+
+# Additional Jerusalem Datasets
+
+The Jerusalem DataCity portal also has:
+- **School shelters available to the public** - useful for broader "protected spaces" coverage
+- Direct downloads available in CSV, JSON, XML, GeoJSON, and XLSX formats
+
+Portal URL: https://jerusalem.datacity.org.il/

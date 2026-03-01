@@ -1,4 +1,7 @@
-// Shelter types from Tel Aviv ArcGIS layer 592
+// City identifiers for multi-city support
+export type City = 'tel-aviv' | 'jerusalem';
+
+// Shelter types from multiple city data sources
 export interface Shelter {
   id: string;
   lat: number;
@@ -9,6 +12,7 @@ export interface Shelter {
   isOpen?: boolean;
   openingTimes?: string;
   capacity?: number;
+  city: City;
 }
 
 export type ShelterType = 

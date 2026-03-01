@@ -878,7 +878,7 @@ export default function Home() {
         <div className="panel-header">
           <div className="panel-header-content">
             <h1>🛡️ דרך צלחה</h1>
-            {!isPanelMinimized && <p>מצא מסלול הליכה בטוח עם מקלטים בתל אביב</p>}
+            {!isPanelMinimized && <p>מצא מסלול הליכה בטוח עם מקלטים</p>}
           </div>
           <button
             className="panel-toggle-btn"

@@ -204,10 +204,11 @@ function calculateCombinedScore(metrics: RouteMetrics, safetyWeight: number): nu
  */
 export async function geocodeAddress(address: string): Promise<RoutePoint | null> {
   const url = new URL('https://nominatim.openstreetmap.org/search');
-  url.searchParams.set('q', `${address}, תל אביב, ישראל`);
+  url.searchParams.set('q', `${address}, ישראל`);
   url.searchParams.set('format', 'json');
   url.searchParams.set('limit', '1');
   url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('countrycodes', 'il');
 
   try {
     const response = await fetch(url.toString(), {
@@ -326,8 +327,9 @@ export async function getAddressSuggestions(query: string): Promise<AddressSugge
   url.searchParams.set('format', 'json');
   url.searchParams.set('limit', '5');
   url.searchParams.set('addressdetails', '1');
-  // Bias results to Tel Aviv area (viewbox: west, north, east, south)
-  url.searchParams.set('viewbox', '34.65,32.15,34.90,31.95');
+  // Bias results to Tel Aviv and Jerusalem area (viewbox: west, north, east, south)
+  // Covers from Tel Aviv (west) to Jerusalem (east)
+  url.searchParams.set('viewbox', '34.65,32.15,35.30,31.70');
   url.searchParams.set('bounded', '0'); // Prefer but don't strictly limit to viewbox
   url.searchParams.set('countrycodes', 'il'); // Limit to Israel
 
