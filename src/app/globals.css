@@ -583,6 +583,25 @@ body {
   font-weight: 500;
 }
 
+.popup-navigate-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.popup-navigate-btn:hover {
+  background: var(--primary-hover);
+}
+
 /* Location button */
 .location-btn {
   position: absolute;

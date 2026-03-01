@@ -127,6 +127,9 @@ export default function Home() {
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
   const destinationRef = useRef<RoutePoint | null>(null);
+  
+  // Ref to store routeToShelter function for popup click handlers
+  const routeToShelterRef = useRef<((lat: number, lon: number, address: string) => Promise<void>) | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -136,6 +139,11 @@ export default function Home() {
   useEffect(() => {
     destinationRef.current = destination;
   }, [destination]);
+
+  // Keep routeToShelter ref updated for popup click handlers
+  useEffect(() => {
+    routeToShelterRef.current = routeToShelter;
+  });
 
   // Fetch origin suggestions
   useEffect(() => {
@@ -273,16 +281,40 @@ export default function Home() {
         el.classList.add('accessible');
       }
 
+      const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+        <div class="popup-title">${getShelterTypeLabel(shelter.type)}</div>
+        <div class="popup-address">${shelter.address}</div>
+        ${shelter.isAccessible ? '<span class="popup-type">♿ נגיש</span>' : ''}
+        ${isNearRoute ? '<span class="popup-type near-route-badge">📍 על המסלול</span>' : ''}
+        <button class="popup-navigate-btn" data-lat="${shelter.lat}" data-lon="${shelter.lon}" data-address="${shelter.address}">
+          🧭 נווט למקלט
+        </button>
+      `);
+
+      // Attach click handler when popup opens
+      popup.on('open', () => {
+        const btn = document.querySelector('.popup-navigate-btn');
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const lat = parseFloat(target.getAttribute('data-lat') || '0');
+            const lon = parseFloat(target.getAttribute('data-lon') || '0');
+            const address = target.getAttribute('data-address') || '';
+            
+            // Close the popup
+            popup.remove();
+            
+            // Route to the shelter
+            if (routeToShelterRef.current) {
+              routeToShelterRef.current(lat, lon, address);
+            }
+          });
+        }
+      });
+
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([shelter.lon, shelter.lat])
-        .setPopup(
-          new maplibregl.Popup({ offset: 25 }).setHTML(`
-            <div class="popup-title">${getShelterTypeLabel(shelter.type)}</div>
-            <div class="popup-address">${shelter.address}</div>
-            ${shelter.isAccessible ? '<span class="popup-type">♿ נגיש</span>' : ''}
-            ${isNearRoute ? '<span class="popup-type near-route-badge">📍 על המסלול</span>' : ''}
-          `)
-        )
+        .setPopup(popup)
         .addTo(map.current!);
 
       markersRef.current.push(marker);
@@ -654,6 +686,86 @@ export default function Home() {
     );
   };
 
+  // Route to a specific shelter from user's current location
+  const routeToShelter = async (shelterLat: number, shelterLon: number, shelterAddress: string) => {
+    if (!spatialIndex) {
+      alert('המקלטים עדיין נטענים, נסה שוב');
+      return;
+    }
+
+    setRouteLoading(true);
+    setRouteError(null);
+    setSafestRoute(null);
+
+    const calculateRoute = async (userLat: number, userLon: number) => {
+      try {
+        // Set origin as current location
+        const originAddress = await reverseGeocode(userLat, userLon);
+        const originPoint: RoutePoint = { lat: userLat, lon: userLon, address: originAddress };
+        setOrigin(originPoint);
+        setOriginInput(originAddress);
+
+        // Set destination as the shelter
+        const destPoint: RoutePoint = {
+          lat: shelterLat,
+          lon: shelterLon,
+          address: shelterAddress,
+        };
+        setDestination(destPoint);
+        setDestinationInput(shelterAddress);
+
+        // Get walking route
+        const orsRoutes = await getWalkingRoutes(originPoint, destPoint);
+        
+        if (orsRoutes.length === 0) {
+          setRouteError('לא נמצא מסלול למקלט. נסה שוב.');
+          return;
+        }
+
+        // Score and set the route
+        const scoredRoutes = scoreAndRankRoutes(orsRoutes, spatialIndex, 1.0);
+        setSafestRoute(scoredRoutes[0]);
+
+        // Expand panel if minimized
+        setIsPanelMinimized(false);
+      } catch (error) {
+        console.error('Route to shelter failed:', error);
+        setRouteError('שגיאה במציאת מסלול למקלט. נסה שוב.');
+      } finally {
+        setRouteLoading(false);
+      }
+    };
+
+    // Use live location if available, otherwise request it
+    if (userLocation) {
+      await calculateRoute(userLocation.lat, userLocation.lon);
+    } else {
+      // Request location
+      if (!navigator.geolocation) {
+        alert('הדפדפן שלך לא תומך במיקום');
+        setRouteLoading(false);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          await calculateRoute(latitude, longitude);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          alert('לא הצלחנו לקבל את המיקום שלך. אנא אפשר גישה למיקום.');
+          setRouteLoading(false);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    }
+  };
+
   // SOS - Find nearest shelter from current location
   const handleSOS = async () => {
     if (!spatialIndex) {
@@ -665,59 +777,24 @@ export default function Home() {
     setRouteError(null);
     setSafestRoute(null);
 
-    // Helper function to route to nearest shelter
-    const routeToNearestShelter = async (lat: number, lon: number) => {
-      try {
-        // Find nearest shelter
-        const nearestShelter = spatialIndex.getNearestShelter(lat, lon);
-        
-        if (!nearestShelter) {
-          setRouteError('לא נמצא מקלט קרוב. נסה שוב.');
-          setSosLoading(false);
-          return;
-        }
-
-        // Set origin as current location
-        const originAddress = await reverseGeocode(lat, lon);
-        const originPoint: RoutePoint = { lat, lon, address: originAddress };
-        setOrigin(originPoint);
-        setOriginInput(originAddress);
-
-        // Set destination as nearest shelter
-        const destPoint: RoutePoint = {
-          lat: nearestShelter.lat,
-          lon: nearestShelter.lon,
-          address: nearestShelter.address,
-        };
-        setDestination(destPoint);
-        setDestinationInput(nearestShelter.address);
-
-        // Get walking route
-        const orsRoutes = await getWalkingRoutes(originPoint, destPoint);
-        
-        if (orsRoutes.length === 0) {
-          setRouteError('לא נמצא מסלול למקלט. נסה שוב.');
-          setSosLoading(false);
-          return;
-        }
-
-        // Score and set the route
-        const scoredRoutes = scoreAndRankRoutes(orsRoutes, spatialIndex, 1.0);
-        setSafestRoute(scoredRoutes[0]);
-
-        // Expand panel if minimized
-        setIsPanelMinimized(false);
-      } catch (error) {
-        console.error('SOS route failed:', error);
-        setRouteError('שגיאה במציאת מסלול למקלט. נסה שוב.');
-      } finally {
+    const findAndRouteToNearest = async (lat: number, lon: number) => {
+      // Find nearest shelter
+      const nearestShelter = spatialIndex.getNearestShelter(lat, lon);
+      
+      if (!nearestShelter) {
+        setRouteError('לא נמצא מקלט קרוב. נסה שוב.');
         setSosLoading(false);
+        return;
       }
+
+      // Use the shared routeToShelter function
+      setSosLoading(false); // Let routeToShelter handle its own loading state
+      await routeToShelter(nearestShelter.lat, nearestShelter.lon, nearestShelter.address);
     };
 
     // Use live location if available, otherwise request it
     if (userLocation) {
-      await routeToNearestShelter(userLocation.lat, userLocation.lon);
+      await findAndRouteToNearest(userLocation.lat, userLocation.lon);
     } else {
       // Request location
       if (!navigator.geolocation) {
@@ -729,7 +806,7 @@ export default function Home() {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          await routeToNearestShelter(latitude, longitude);
+          await findAndRouteToNearest(latitude, longitude);
         },
         (error) => {
           console.error('Geolocation error:', error);
