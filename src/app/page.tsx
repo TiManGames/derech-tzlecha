@@ -19,6 +19,10 @@ import { ShelterSpatialIndex } from '@/lib/spatial';
 const TEL_AVIV_CENTER: [number, number] = [34.7818, 32.0853];
 const DEFAULT_ZOOM = 13;
 
+// Location accuracy thresholds
+const MAX_ACCURACY_THRESHOLD = 100; // Only show location if accuracy is better than 100 meters
+const MAX_ACCURACY_CIRCLE_RADIUS = 100; // Cap the accuracy circle at 100 meters
+
 // Helper function to create a circle GeoJSON polygon from center point and radius in meters
 function createCircleGeoJSON(
   centerLon: number,
@@ -414,7 +418,14 @@ export default function Home() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
-        setUserLocation({ lat: latitude, lon: longitude, accuracy });
+        
+        // Only update location if accuracy is good enough
+        if (accuracy <= MAX_ACCURACY_THRESHOLD) {
+          setUserLocation({ lat: latitude, lon: longitude, accuracy });
+        } else {
+          // If accuracy is poor, clear the location marker
+          console.log(`Location accuracy too low: ${accuracy}m (threshold: ${MAX_ACCURACY_THRESHOLD}m)`);
+        }
       },
       (error) => {
         // Silently fail - don't show error to user
@@ -423,7 +434,7 @@ export default function Home() {
       {
         enableHighAccuracy: true,
         maximumAge: 5000,
-        timeout: 15000,
+        timeout: 20000, // Increased timeout to allow GPS to get a better fix
       }
     );
 
@@ -467,11 +478,12 @@ export default function Home() {
         .setLngLat([userLocation.lon, userLocation.lat])
         .addTo(map.current);
 
-      // Add accuracy circle as a GeoJSON layer
+      // Add accuracy circle as a GeoJSON layer (capped at MAX_ACCURACY_CIRCLE_RADIUS)
+      const circleRadius = Math.min(userLocation.accuracy, MAX_ACCURACY_CIRCLE_RADIUS);
       const circleGeoJSON = createCircleGeoJSON(
         userLocation.lon,
         userLocation.lat,
-        userLocation.accuracy
+        circleRadius
       );
 
       map.current.addSource('user-accuracy', {
