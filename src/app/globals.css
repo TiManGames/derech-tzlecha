@@ -132,6 +132,15 @@ body {
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-primary);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-header-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .panel-header h1 {
@@ -144,6 +153,55 @@ body {
 .panel-header p {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+/* Panel toggle button - visible only on mobile */
+.panel-toggle-btn {
+  display: none;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.panel-toggle-btn:hover {
+  background: var(--border-color);
+}
+
+.panel-toggle-btn svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .panel-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Minimized panel state */
+.control-panel.minimized {
+  max-height: none;
+}
+
+.control-panel.minimized .panel-header {
+  border-bottom: none;
+}
+
+.control-panel.minimized .panel-header h1 {
+  margin-bottom: 0;
+}
+
+.panel-content.hidden {
+  display: none;
 }
 
 .panel-content {
@@ -520,7 +578,14 @@ body {
 
 @media (max-width: 768px) {
   .location-btn {
-    bottom: calc(60vh + 16px);
+    bottom: calc(55vh + 16px);
+    transition: bottom 0.3s ease;
+  }
+  
+  /* When panel is minimized, move location button down */
+  .control-panel.minimized ~ .location-btn,
+  body:has(.control-panel.minimized) .location-btn {
+    bottom: 80px;
   }
 }
 
@@ -632,4 +697,22 @@ body {
 
 .autocomplete-item:active {
   background: var(--border-color);
+}
+
+/* MapLibre controls positioning */
+.maplibregl-ctrl-bottom-left {
+  left: 16px;
+  bottom: 120px;
+}
+
+@media (max-width: 768px) {
+  .maplibregl-ctrl-bottom-left {
+    left: 16px;
+    bottom: auto;
+    top: 16px;
+  }
+  
+  .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+    margin: 0 0 10px 0;
+  }
 }

@@ -117,6 +117,7 @@ export default function Home() {
   });
 
   const [mapReady, setMapReady] = useState(false);
+  const [isPanelMinimized, setIsPanelMinimized] = useState(false);
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -653,13 +654,28 @@ export default function Home() {
       </button>
 
       {/* Control Panel */}
-      <div className="control-panel">
+      <div className={`control-panel ${isPanelMinimized ? 'minimized' : ''}`}>
         <div className="panel-header">
-          <h1>🛡️ דרך צלחה</h1>
-          <p>מצא מסלול הליכה בטוח עם מקלטים בתל אביב</p>
+          <div className="panel-header-content">
+            <h1>🛡️ דרך צלחה</h1>
+            {!isPanelMinimized && <p>מצא מסלול הליכה בטוח עם מקלטים בתל אביב</p>}
+          </div>
+          <button
+            className="panel-toggle-btn"
+            onClick={() => setIsPanelMinimized(!isPanelMinimized)}
+            aria-label={isPanelMinimized ? 'הרחב פאנל' : 'מזער פאנל'}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              {isPanelMinimized ? (
+                <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+              ) : (
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+              )}
+            </svg>
+          </button>
         </div>
 
-        <div className="panel-content">
+        <div className={`panel-content ${isPanelMinimized ? 'hidden' : ''}`}>
           {/* Loading state */}
           {sheltersLoading && (
             <div className="loading">
