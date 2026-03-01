@@ -19,6 +19,37 @@ import { ShelterSpatialIndex } from '@/lib/spatial';
 const TEL_AVIV_CENTER: [number, number] = [34.7818, 32.0853];
 const DEFAULT_ZOOM = 13;
 
+// Helper function to create a circle GeoJSON polygon from center point and radius in meters
+function createCircleGeoJSON(
+  centerLon: number,
+  centerLat: number,
+  radiusMeters: number,
+  points: number = 64
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const coords: [number, number][] = [];
+  const earthRadius = 6371000; // Earth's radius in meters
+
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const latOffset = (radiusMeters / earthRadius) * Math.cos(angle);
+    const lonOffset = (radiusMeters / earthRadius) * Math.sin(angle) / Math.cos(centerLat * Math.PI / 180);
+    
+    coords.push([
+      centerLon + lonOffset * (180 / Math.PI),
+      centerLat + latOffset * (180 / Math.PI)
+    ]);
+  }
+
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [coords]
+    }
+  };
+}
+
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -44,6 +75,12 @@ export default function Home() {
   const originMarkerRef = useRef<maplibregl.Marker | null>(null);
   const destMarkerRef = useRef<maplibregl.Marker | null>(null);
   const routeResultsRef = useRef<HTMLDivElement>(null);
+
+  // Live location tracking state
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const hasInitialCenterRef = useRef(false);
 
   // App state
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -366,6 +403,102 @@ export default function Home() {
       }, 100);
     }
   }, [safestRoute]);
+
+  // Start live location tracking when map is ready
+  useEffect(() => {
+    if (!mapReady || !map.current) return;
+    if (!navigator.geolocation) return;
+
+    // Start watching position
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        setUserLocation({ lat: latitude, lon: longitude, accuracy });
+      },
+      (error) => {
+        // Silently fail - don't show error to user
+        console.log('Geolocation watch error:', error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 15000,
+      }
+    );
+
+    // Cleanup on unmount
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [mapReady]);
+
+  // Update user location marker and accuracy circle
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+
+    // Remove existing user marker
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove();
+      userMarkerRef.current = null;
+    }
+
+    // Remove existing accuracy circle
+    if (map.current.getLayer('user-accuracy-circle')) {
+      map.current.removeLayer('user-accuracy-circle');
+    }
+    if (map.current.getSource('user-accuracy')) {
+      map.current.removeSource('user-accuracy');
+    }
+
+    if (userLocation) {
+      // Create the blue pulsing dot marker
+      const el = document.createElement('div');
+      el.className = 'user-location-marker';
+      el.innerHTML = `
+        <div class="user-location-pulse"></div>
+        <div class="user-location-dot"></div>
+      `;
+
+      userMarkerRef.current = new maplibregl.Marker({ element: el })
+        .setLngLat([userLocation.lon, userLocation.lat])
+        .addTo(map.current);
+
+      // Add accuracy circle as a GeoJSON layer
+      const circleGeoJSON = createCircleGeoJSON(
+        userLocation.lon,
+        userLocation.lat,
+        userLocation.accuracy
+      );
+
+      map.current.addSource('user-accuracy', {
+        type: 'geojson',
+        data: circleGeoJSON,
+      });
+
+      map.current.addLayer({
+        id: 'user-accuracy-circle',
+        type: 'fill',
+        source: 'user-accuracy',
+        paint: {
+          'fill-color': '#4285f4',
+          'fill-opacity': 0.15,
+        },
+      });
+
+      // Center map on first location received (one-time)
+      if (!hasInitialCenterRef.current) {
+        hasInitialCenterRef.current = true;
+        map.current.flyTo({
+          center: [userLocation.lon, userLocation.lat],
+          zoom: 15,
+          duration: 1000,
+        });
+      }
+    }
+  }, [userLocation, mapReady]);
 
   // Search for the safest route
   const handleSearch = async () => {

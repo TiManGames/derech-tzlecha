@@ -524,6 +524,51 @@ body {
   }
 }
 
+/* User location marker - blue pulsing dot */
+.user-location-marker {
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.user-location-dot {
+  width: 14px;
+  height: 14px;
+  background: #4285f4;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.user-location-pulse {
+  width: 24px;
+  height: 24px;
+  background: rgba(66, 133, 244, 0.3);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: location-pulse 2s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes location-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
 /* Point markers */
 .point-marker {
   width: 36px;
