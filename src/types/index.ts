@@ -80,7 +80,8 @@ export interface RoutePoint {
 export interface RouteMetrics {
   distanceKm: number;
   durationMinutes: number;
-  maxGapToShelter: number;      // meters
+  minDistanceToShelter: number; // meters - closest shelter along route
+  maxGapToShelter: number;      // meters - farthest point from any shelter
   avgDistanceToShelter: number; // meters
   sheltersNearRoute: number;    // count within corridor
   safetyScore: number;          // 0-100

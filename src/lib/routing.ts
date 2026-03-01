@@ -154,8 +154,13 @@ function calculateRouteMetrics(
     spatialIndex.getNearestShelterDistance(lat, lon)
   );
 
+  // Filter out Infinity values for min calculation
+  const finiteDistances = distances.filter(d => isFinite(d));
+  const minDistanceToShelter = finiteDistances.length > 0 ? Math.min(...finiteDistances) : Infinity;
   const maxGapToShelter = Math.max(...distances);
-  const avgDistanceToShelter = distances.reduce((a, b) => a + b, 0) / distances.length;
+  const avgDistanceToShelter = finiteDistances.length > 0 
+    ? finiteDistances.reduce((a, b) => a + b, 0) / finiteDistances.length 
+    : Infinity;
   const sheltersNearRoute = spatialIndex.getSheltersNearRoute(geometry, 150).length;
 
   // Calculate safety score (0-100, higher is safer)
@@ -169,6 +174,7 @@ function calculateRouteMetrics(
   return {
     distanceKm: distanceMeters / 1000,
     durationMinutes: durationSeconds / 60,
+    minDistanceToShelter,
     maxGapToShelter,
     avgDistanceToShelter,
     sheltersNearRoute,

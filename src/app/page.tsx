@@ -257,7 +257,10 @@ export default function Home() {
     if (origin) {
       const el = document.createElement('div');
       el.className = 'point-marker origin';
-      el.innerHTML = 'א';
+      // Location pin SVG icon
+      el.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>`;
 
       originMarkerRef.current = new maplibregl.Marker({ element: el })
         .setLngLat([origin.lon, origin.lat])
@@ -277,7 +280,10 @@ export default function Home() {
     if (destination) {
       const el = document.createElement('div');
       el.className = 'point-marker destination';
-      el.innerHTML = 'ב';
+      // Flag SVG icon
+      el.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14.4 6L14 4H5v17h2v-7h5.6l.4 2h7V6z"/>
+      </svg>`;
 
       destMarkerRef.current = new maplibregl.Marker({ element: el })
         .setLngLat([destination.lon, destination.lat])
@@ -680,31 +686,43 @@ export default function Home() {
                         <span className="metric-value">{safestRoute.metrics.sheltersNearRoute}</span>
                       </div>
                       <div className="metric">
-                        <span className="metric-label">זמן הליכה מקס׳ למקלט</span>
+                        <span className="metric-label">זמן הליכה למקלט</span>
                         <span className="metric-value">
                           {(() => {
                             // Case 1: No shelters near route at all
                             if (safestRoute.metrics.sheltersNearRoute === 0) {
-                              return 'אין מקלט בטווח בכל הדרך או בחלק ממנה';
+                              return 'אין מקלט בטווח';
                             }
                             
-                            const maxGap = safestRoute.metrics.maxGapToShelter;
+                            const minDist = safestRoute.metrics.minDistanceToShelter;
+                            const maxDist = safestRoute.metrics.maxGapToShelter;
                             
-                            // Convert distance to time (walking speed ~1.4 m/s = 5 km/h)
-                            const seconds = Math.round(maxGap / 1.4);
-                            const minutes = Math.floor(seconds / 60);
+                            // Helper function to format time
+                            const formatTime = (meters: number): string => {
+                              const seconds = Math.round(meters / 1.4);
+                              const minutes = Math.floor(seconds / 60);
+                              const remainingSeconds = seconds % 60;
+                              if (minutes === 0) {
+                                return `${remainingSeconds} שנ׳`;
+                              }
+                              return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                            };
                             
-                            // Case 2: Shelters exist but walk time > 5 minutes
-                            if (!isFinite(maxGap) || minutes >= 5) {
-                              return 'ארוך מאוד (+5 דקות)';
+                            // Check for invalid values
+                            if (!isFinite(minDist) || !isFinite(maxDist)) {
+                              return 'לא זמין';
                             }
                             
-                            // Case 3: Normal time display
-                            const remainingSeconds = seconds % 60;
-                            if (minutes === 0) {
-                              return `${remainingSeconds} שנ׳`;
+                            const minTime = formatTime(minDist);
+                            const maxTime = formatTime(maxDist);
+                            
+                            // If max is very long (>5 min), show warning
+                            const maxSeconds = Math.round(maxDist / 1.4);
+                            if (maxSeconds >= 300) {
+                              return `${minTime} - +5 דק׳`;
                             }
-                            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')} דק׳`;
+                            
+                            return `${minTime} - ${maxTime} דק׳`;
                           })()}
                         </span>
                       </div>
