@@ -635,16 +635,29 @@ body {
 
 @media (max-width: 768px) {
   .sos-btn {
-    top: auto;
-    bottom: calc(60vh + 16px);
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 14px 24px;
-    font-size: 1.1rem;
+    top: 16px;
+    bottom: auto;
+    left: auto;
+    right: 16px;
+    transform: none;
+    padding: 10px;
+    font-size: 1.25rem;
+    min-width: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
   }
   
   .sos-btn:hover:not(:disabled) {
-    transform: translateX(-50%) translateY(-2px);
+    transform: translateY(-2px);
+  }
+  
+  .sos-btn .sos-text {
+    display: none;
+  }
+  
+  .sos-btn .sos-icon {
+    font-size: 1.25rem;
   }
 }
 
