@@ -83,6 +83,7 @@ export default function Home() {
   // Live location tracking state
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
   const [userHeading, setUserHeading] = useState<number | null>(null);
+  const [mapBearing, setMapBearing] = useState<number>(0);
   const watchIdRef = useRef<number | null>(null);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasInitialCenterRef = useRef(false);
@@ -200,6 +201,13 @@ export default function Home() {
 
     map.current.on('load', () => {
       setMapReady(true);
+    });
+
+    // Track map rotation for direction cone compensation
+    map.current.on('rotate', () => {
+      if (map.current) {
+        setMapBearing(map.current.getBearing());
+      }
     });
 
     // Handle map clicks for setting origin/destination
@@ -510,8 +518,9 @@ export default function Home() {
       el.className = 'user-location-marker';
       
       // Add direction cone if heading is available
+      // Compensate for map rotation by subtracting map bearing
       const coneHtml = userHeading !== null 
-        ? `<div class="user-location-cone" style="--heading: ${userHeading}deg"></div>`
+        ? `<div class="user-location-cone" style="--heading: ${userHeading}deg; --map-bearing: ${mapBearing}deg"></div>`
         : '';
       
       el.innerHTML = `
@@ -557,7 +566,7 @@ export default function Home() {
         });
       }
     }
-  }, [userLocation, userHeading, mapReady]);
+  }, [userLocation, userHeading, mapBearing, mapReady]);
 
   // Search for the safest route
   const handleSearch = async () => {
