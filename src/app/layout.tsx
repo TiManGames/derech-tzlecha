@@ -9,9 +9,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'דרך צלחה - מסלול הליכה בטוח בתל אביב',
-  description: 'מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים בתל אביב',
-  keywords: ['מקלטים', 'תל אביב', 'מסלול בטוח', 'הליכה', 'מיגון'],
+  title: 'דרך צלחה - מסלול הליכה בטוח',
+  description: 'מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים',
+  keywords: ['מקלטים', 'תל אביב', 'ירושלים', 'מסלול בטוח', 'הליכה', 'מיגון'],
   authors: [{ name: 'דרך צלחה' }],
   manifest: '/derech-tzlecha/manifest.json',
   icons: {

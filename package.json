@@ -1,7 +1,7 @@
 {
   "name": "derech-tzlecha",
   "version": "1.0.0",
-  "description": "מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים בתל אביב",
+  "description": "מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים",
   "private": true,
   "scripts": {
     "dev": "next dev",

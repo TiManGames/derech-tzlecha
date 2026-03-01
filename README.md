@@ -2,7 +2,12 @@
 
 Find the safest walking route with public shelters in Tel Aviv.
 
-מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים בתל אביב.
+מצא את המסלול הבטוח ביותר עם מקלטים ציבוריים
+
+ערים נתמכות:
+
+- תל אביב
+- ירושליים
 
 ## Features
 
