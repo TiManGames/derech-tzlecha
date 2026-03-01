@@ -335,6 +335,18 @@ body {
   background: rgba(37, 99, 235, 0.05);
 }
 
+/* Start Walking button */
+.start-walking-btn {
+  margin-top: 12px;
+  background: linear-gradient(135deg, var(--success-color) 0%, #15803d 100%);
+  font-size: 1rem;
+  padding: 12px 16px;
+}
+
+.start-walking-btn:hover {
+  background: linear-gradient(135deg, #22c55e 0%, var(--success-color) 100%);
+}
+
 .route-header {
   display: flex;
   justify-content: space-between;

@@ -125,6 +125,7 @@ export default function Home() {
   const [mapReady, setMapReady] = useState(false);
   const [isPanelMinimized, setIsPanelMinimized] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
+  const [isSosRoute, setIsSosRoute] = useState(false); // Track if current route is from SOS button
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -575,6 +576,7 @@ export default function Home() {
     setRouteLoading(true);
     setRouteError(null);
     setSafestRoute(null);
+    setIsSosRoute(false); // Regular route search, not SOS
 
     try {
       const orsRoutes = await getWalkingRoutes(origin, destination);
@@ -798,6 +800,8 @@ export default function Home() {
     setSosLoading(true);
     setRouteError(null);
     setSafestRoute(null);
+    setIsSosRoute(true); // Mark this as an SOS route
+    setIsPanelMinimized(true); // Close the panel automatically
 
     const findAndRouteToNearest = async (lat: number, lon: number) => {
       // Find nearest shelter
@@ -1045,7 +1049,7 @@ export default function Home() {
               {safestRoute && (
                 <div className="route-results" ref={routeResultsRef}>
                   <h3 style={{ fontSize: '0.875rem', marginBottom: '12px' }}>
-                    🛡️ המסלול הבטוח ביותר
+                    {isSosRoute ? '🆘 מסלול למקלט הקרוב' : '🛡️ המסלול הבטוח ביותר'}
                   </h3>
                   <div className="route-card selected">
                     <div className="route-metrics">
@@ -1061,53 +1065,83 @@ export default function Home() {
                           {Math.round(safestRoute.metrics.durationMinutes)} דק׳
                         </span>
                       </div>
-                      <div className="metric">
-                        <span className="metric-label">מקלטים בדרך</span>
-                        <span className="metric-value">{safestRoute.metrics.sheltersNearRoute}</span>
-                      </div>
-                      <div className="metric">
-                        <span className="metric-label">זמן הליכה למקלט</span>
-                        <span className="metric-value">
-                          {(() => {
-                            // Case 1: No shelters near route at all
-                            if (safestRoute.metrics.sheltersNearRoute === 0) {
-                              return 'אין מקלט בטווח';
-                            }
-                            
-                            const minDist = safestRoute.metrics.minDistanceToShelter;
-                            const maxDist = safestRoute.metrics.maxGapToShelter;
-                            
-                            // Helper function to format time
-                            const formatTime = (meters: number): string => {
-                              const seconds = Math.round(meters / 1.4);
-                              const minutes = Math.floor(seconds / 60);
-                              const remainingSeconds = seconds % 60;
-                              if (minutes === 0) {
-                                return `${remainingSeconds} שנ׳`;
-                              }
-                              return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-                            };
-                            
-                            // Check for invalid values
-                            if (!isFinite(minDist) || !isFinite(maxDist)) {
-                              return 'לא זמין';
-                            }
-                            
-                            const minTime = formatTime(minDist);
-                            const maxTime = formatTime(maxDist);
-                            
-                            // If max is very long (>5 min), show warning
-                            const maxSeconds = Math.round(maxDist / 1.4);
-                            if (maxSeconds >= 300) {
-                              return `${minTime} - +5 דק׳`;
-                            }
-                            
-                            return `${minTime} - ${maxTime} דק׳`;
-                          })()}
-                        </span>
-                      </div>
+                      {/* Only show shelters on the way for regular routes, not SOS */}
+                      {!isSosRoute && (
+                        <>
+                          <div className="metric">
+                            <span className="metric-label">מקלטים בדרך</span>
+                            <span className="metric-value">{safestRoute.metrics.sheltersNearRoute}</span>
+                          </div>
+                          <div className="metric">
+                            <span className="metric-label">זמן הליכה למקלט</span>
+                            <span className="metric-value">
+                              {(() => {
+                                // Case 1: No shelters near route at all
+                                if (safestRoute.metrics.sheltersNearRoute === 0) {
+                                  return 'אין מקלט בטווח';
+                                }
+                                
+                                const minDist = safestRoute.metrics.minDistanceToShelter;
+                                const maxDist = safestRoute.metrics.maxGapToShelter;
+                                
+                                // Helper function to format time
+                                const formatTime = (meters: number): string => {
+                                  const seconds = Math.round(meters / 1.4);
+                                  const minutes = Math.floor(seconds / 60);
+                                  const remainingSeconds = seconds % 60;
+                                  if (minutes === 0) {
+                                    return `${remainingSeconds} שנ׳`;
+                                  }
+                                  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                                };
+                                
+                                // Check for invalid values
+                                if (!isFinite(minDist) || !isFinite(maxDist)) {
+                                  return 'לא זמין';
+                                }
+                                
+                                const minTime = formatTime(minDist);
+                                const maxTime = formatTime(maxDist);
+                                
+                                // If max is very long (>5 min), show warning
+                                const maxSeconds = Math.round(maxDist / 1.4);
+                                if (maxSeconds >= 300) {
+                                  return `${minTime} - +5 דק׳`;
+                                }
+                                
+                                return `${minTime} - ${maxTime} דק׳`;
+                              })()}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
+                  {/* Start Walking button */}
+                  <button
+                    className="btn btn-primary btn-full start-walking-btn"
+                    onClick={() => {
+                      // Close the panel
+                      setIsPanelMinimized(true);
+                      // Zoom to user location if available
+                      if (userLocation && map.current) {
+                        map.current.flyTo({
+                          center: [userLocation.lon, userLocation.lat],
+                          zoom: 17,
+                          duration: 1000,
+                        });
+                      } else if (origin && map.current) {
+                        // Fallback to origin if no live location
+                        map.current.flyTo({
+                          center: [origin.lon, origin.lat],
+                          zoom: 17,
+                          duration: 1000,
+                        });
+                      }
+                    }}
+                  >
+                    🚶 התחל הליכה
+                  </button>
                 </div>
               )}
 
