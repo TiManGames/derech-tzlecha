@@ -571,6 +571,10 @@ body {
   }
 }
 
+/* Shelter markers not near the route - hidden when route is active */
+.shelter-marker.faded {
+  display: none;
+}
 
 /* Map popup */
 .maplibregl-popup-content {
