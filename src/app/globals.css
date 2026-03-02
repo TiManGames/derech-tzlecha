@@ -712,24 +712,18 @@ body {
     left: auto;
     right: 16px;
     transform: none;
-    padding: 10px;
-    font-size: 1.25rem;
+    padding: 10px 16px;
+    font-size: 0.9rem;
     min-width: auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
+    border-radius: 12px;
   }
   
   .sos-btn:hover:not(:disabled) {
     transform: translateY(-2px);
   }
   
-  .sos-btn .sos-text {
-    display: none;
-  }
-  
   .sos-btn .sos-icon {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
   }
 }
 

@@ -87,6 +87,7 @@ export default function Home() {
   const watchIdRef = useRef<number | null>(null);
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasInitialCenterRef = useRef(false);
+  const hasAutoFilledOriginRef = useRef(false); // Track if origin was auto-filled on load
 
   // App state
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -569,6 +570,30 @@ export default function Home() {
     }
   }, [userLocation, userHeading, mapBearing, mapReady]);
 
+  // Auto-fill origin with user's current location on first load
+  useEffect(() => {
+    // Only auto-fill once, when we get the first valid location
+    if (
+      userLocation &&
+      !hasAutoFilledOriginRef.current &&
+      !origin // Don't overwrite if user already set an origin
+    ) {
+      hasAutoFilledOriginRef.current = true;
+      
+      // Reverse geocode and set the origin
+      (async () => {
+        try {
+          const address = await reverseGeocode(userLocation.lat, userLocation.lon);
+          setOrigin({ lat: userLocation.lat, lon: userLocation.lon, address });
+          setOriginInput(address);
+        } catch (error) {
+          console.error('Failed to auto-fill origin:', error);
+          // Still mark as attempted so we don't retry
+        }
+      })();
+    }
+  }, [userLocation, origin]);
+
   // Search for the safest route
   const handleSearch = async () => {
     if (!origin || !destination || !spatialIndex) return;
@@ -871,7 +896,6 @@ export default function Home() {
           <div className="spinner sos-spinner"></div>
         ) : (
           <>
-            <span className="sos-icon">🆘</span>
             <span className="sos-text">מקלט קרוב</span>
           </>
         )}
