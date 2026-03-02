@@ -1376,7 +1376,7 @@ export default function Home() {
             <div className="credit">
               Made by{' '}
               <a
-                href="https://www.linkedin.com/in/rom-bernheimer-9364b9174/"
+                href="https://github.com/TiManGames"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="credit-link"
