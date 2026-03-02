@@ -92,6 +92,7 @@ export default function Home() {
   // Compass heading state
   const [compassPermissionNeeded, setCompassPermissionNeeded] = useState(false);
   const lastHeadingRef = useRef<number | null>(null); // For smoothing
+  const userConeRef = useRef<HTMLDivElement | null>(null); // Ref to cone element for direct updates
 
   // App state
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -610,7 +611,7 @@ export default function Home() {
     }
   };
 
-  // Update user location marker and accuracy circle
+  // Update user location marker and accuracy circle (only when location changes)
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
@@ -618,6 +619,7 @@ export default function Home() {
     if (userMarkerRef.current) {
       userMarkerRef.current.remove();
       userMarkerRef.current = null;
+      userConeRef.current = null;
     }
 
     // Remove existing accuracy circle
@@ -629,21 +631,27 @@ export default function Home() {
     }
 
     if (userLocation) {
-      // Create the blue pulsing dot marker with optional direction cone
+      // Create the blue pulsing dot marker with direction cone placeholder
       const el = document.createElement('div');
       el.className = 'user-location-marker';
       
-      // Add direction cone if heading is available
-      // Compensate for map rotation by subtracting map bearing
-      const coneHtml = userHeading !== null 
-        ? `<div class="user-location-cone" style="--heading: ${userHeading}deg; --map-bearing: ${mapBearing}deg"></div>`
-        : '';
+      // Always create the cone element (hidden via CSS if no heading)
+      const coneEl = document.createElement('div');
+      coneEl.className = 'user-location-cone';
+      coneEl.style.setProperty('--heading', '0deg');
+      coneEl.style.setProperty('--map-bearing', '0deg');
+      coneEl.style.display = 'none'; // Hidden until we have heading
+      userConeRef.current = coneEl;
       
-      el.innerHTML = `
-        ${coneHtml}
-        <div class="user-location-pulse"></div>
-        <div class="user-location-dot"></div>
-      `;
+      el.appendChild(coneEl);
+      
+      const pulseEl = document.createElement('div');
+      pulseEl.className = 'user-location-pulse';
+      el.appendChild(pulseEl);
+      
+      const dotEl = document.createElement('div');
+      dotEl.className = 'user-location-dot';
+      el.appendChild(dotEl);
 
       userMarkerRef.current = new maplibregl.Marker({ element: el })
         .setLngLat([userLocation.lon, userLocation.lat])
@@ -682,7 +690,22 @@ export default function Home() {
         });
       }
     }
-  }, [userLocation, userHeading, mapBearing, mapReady]);
+  }, [userLocation, mapReady]); // Removed userHeading and mapBearing from dependencies
+
+  // Update direction cone rotation (separate from marker creation to avoid blinking)
+  useEffect(() => {
+    if (!userConeRef.current) return;
+    
+    if (userHeading !== null) {
+      // Show the cone and update its rotation
+      userConeRef.current.style.display = 'block';
+      userConeRef.current.style.setProperty('--heading', `${userHeading}deg`);
+      userConeRef.current.style.setProperty('--map-bearing', `${mapBearing}deg`);
+    } else {
+      // Hide the cone if no heading
+      userConeRef.current.style.display = 'none';
+    }
+  }, [userHeading, mapBearing]);
 
   // Auto-fill origin with user's current location on first load
   useEffect(() => {
