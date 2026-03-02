@@ -874,7 +874,14 @@ export default function Home() {
   };
 
   return (
-    <main style={{ position: 'relative', width: '100vw', height: '100dvh' }}>
+    <main style={{ 
+      position: 'fixed', 
+      top: 0, 
+      left: 0, 
+      width: '100vw', 
+      height: '100dvh',
+      overflow: 'hidden'
+    }}>
       {/* Map */}
       <div ref={mapContainer} className="map-container" />
 
