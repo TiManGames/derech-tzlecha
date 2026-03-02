@@ -92,6 +92,7 @@ export default function Home() {
   const originMarkerRef = useRef<maplibregl.Marker | null>(null);
   const destMarkerRef = useRef<maplibregl.Marker | null>(null);
   const routeResultsRef = useRef<HTMLDivElement>(null);
+  const panelContentRef = useRef<HTMLDivElement>(null);
 
   // Live location tracking state
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
@@ -470,6 +471,13 @@ export default function Home() {
       }, 100);
     }
   }, [safestRoute]);
+
+  // Scroll panel content to top when panel is expanded
+  useEffect(() => {
+    if (!isPanelMinimized && panelContentRef.current) {
+      panelContentRef.current.scrollTop = 0;
+    }
+  }, [isPanelMinimized]);
 
   // Start live location tracking when map is ready
   useEffect(() => {
@@ -1092,7 +1100,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className={`panel-content ${isPanelMinimized ? 'hidden' : ''}`}>
+        <div ref={panelContentRef} className={`panel-content ${isPanelMinimized ? 'hidden' : ''}`}>
           {/* Loading state */}
           {sheltersLoading && (
             <div className="loading">
