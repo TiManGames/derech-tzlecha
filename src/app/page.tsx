@@ -575,8 +575,19 @@ export default function Home() {
     }
   }, [userLocation, userHeading, mapBearing, mapReady]);
 
-  // PWA install prompt - capture beforeinstallprompt event
+  // Register service worker and handle PWA install prompt
   useEffect(() => {
+    // Register service worker (path includes base path for GitHub Pages)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/derech-tzlecha/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered with scope:', registration.scope);
+        })
+        .catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+
     // Check if already running as standalone PWA
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
