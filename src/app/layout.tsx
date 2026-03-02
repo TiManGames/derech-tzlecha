@@ -6,6 +6,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   themeColor: '#ffffff',
+  viewportFit: 'cover', // Extend content into safe areas (notch, home indicator)
 };
 
 export const metadata: Metadata = {
