@@ -801,8 +801,9 @@ body {
   /* Heading: 0=North, 90=East, 180=South, 270=West (clockwise from north)
      CSS rotate: 0=right, 90=down, 180=left, 270=up
      Map bearing: rotation of the map (0 = north up)
-     Formula: (heading - 90) converts compass to CSS, then add map bearing to compensate for map rotation */
-  transform: translate(-50%, -50%) rotate(calc(var(--heading) - 90deg + var(--map-bearing)));
+     Formula: (heading - 90) converts compass to CSS, then subtract map bearing to compensate for map rotation
+     (marker rotates with map, so we counter-rotate by subtracting bearing) */
+  transform: translate(-50%, -50%) rotate(calc(var(--heading) - 90deg - var(--map-bearing)));
   background: conic-gradient(
     from -30deg,
     transparent 0deg,
