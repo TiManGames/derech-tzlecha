@@ -128,6 +128,11 @@ export default function Home() {
   const [sosLoading, setSosLoading] = useState(false);
   const [isSosRoute, setIsSosRoute] = useState(false); // Track if current route is from SOS button
 
+  // PWA install prompt state
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
   const destinationRef = useRef<RoutePoint | null>(null);
@@ -570,6 +575,68 @@ export default function Home() {
     }
   }, [userLocation, userHeading, mapBearing, mapReady]);
 
+  // PWA install prompt - capture beforeinstallprompt event
+  useEffect(() => {
+    // Check if already running as standalone PWA
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+    setIsStandalone(isStandaloneMode);
+
+    // Don't show install banner if already installed
+    if (isStandaloneMode) return;
+
+    // Check if user has dismissed the banner before (stored in localStorage)
+    const dismissed = localStorage.getItem('pwa-install-dismissed');
+    if (dismissed) return;
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Store the event for later use
+      setDeferredPrompt(e);
+      // Show our custom install banner after a short delay
+      setTimeout(() => {
+        setShowInstallBanner(true);
+      }, 3000); // Show after 3 seconds
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Listen for successful installation
+    window.addEventListener('appinstalled', () => {
+      setShowInstallBanner(false);
+      setDeferredPrompt(null);
+      console.log('PWA was installed');
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  // Handle PWA install
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    // Show the install prompt
+    deferredPrompt.prompt();
+
+    // Wait for the user's response
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+
+    // Clear the deferred prompt
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
+  // Dismiss install banner
+  const handleDismissInstall = () => {
+    setShowInstallBanner(false);
+    // Remember dismissal for 7 days
+    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+  };
+
   // Auto-fill origin with user's current location on first load
   useEffect(() => {
     // Only auto-fill once, when we get the first valid location
@@ -900,6 +967,27 @@ export default function Home() {
           </>
         )}
       </button>
+
+      {/* PWA Install Banner */}
+      {showInstallBanner && (
+        <div className="install-banner">
+          <div className="install-banner-content">
+            <div className="install-banner-icon">📲</div>
+            <div className="install-banner-text">
+              <div className="install-banner-title">התקן את האפליקציה</div>
+              <div className="install-banner-subtitle">גישה מהירה יותר ללא סרגל דפדפן</div>
+            </div>
+          </div>
+          <div className="install-banner-actions">
+            <button className="install-banner-btn install" onClick={handleInstallClick}>
+              התקן
+            </button>
+            <button className="install-banner-btn dismiss" onClick={handleDismissInstall}>
+              לא עכשיו
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Control Panel */}
       <div className={`control-panel ${isPanelMinimized ? 'minimized' : ''}`}>
