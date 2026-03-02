@@ -23,6 +23,19 @@ const DEFAULT_ZOOM = 13;
 const MAX_ACCURACY_THRESHOLD = 100; // Only show location if accuracy is better than 100 meters
 const MAX_ACCURACY_CIRCLE_RADIUS = 100; // Cap the accuracy circle at 100 meters
 
+// Panel height on mobile (55vh) - used for map padding calculations
+const MOBILE_PANEL_HEIGHT_PERCENT = 0.55;
+const MOBILE_BREAKPOINT = 768;
+
+// Helper function to get map padding based on panel state
+function getMapPadding(isPanelMinimized: boolean): maplibregl.PaddingOptions {
+  // Only apply padding on mobile when panel is open
+  if (typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT && !isPanelMinimized) {
+    return { bottom: window.innerHeight * MOBILE_PANEL_HEIGHT_PERCENT, top: 0, left: 0, right: 0 };
+  }
+  return { top: 0, bottom: 0, left: 0, right: 0 };
+}
+
 // Helper function to create a circle GeoJSON polygon from center point and radius in meters
 function createCircleGeoJSON(
   centerLon: number,
@@ -687,6 +700,7 @@ export default function Home() {
           center: [userLocation.lon, userLocation.lat],
           zoom: 15,
           duration: 1000,
+          padding: getMapPadding(isPanelMinimized),
         });
       }
     }
@@ -767,7 +781,7 @@ export default function Home() {
     setOriginInput(suggestion.display);
     setShowOriginSuggestions(false);
     if (map.current) {
-      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15 });
+      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15, padding: getMapPadding(isPanelMinimized) });
     }
   };
 
@@ -777,7 +791,7 @@ export default function Home() {
     setDestinationInput(suggestion.display);
     setShowDestSuggestions(false);
     if (map.current) {
-      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15 });
+      map.current.flyTo({ center: [suggestion.lon, suggestion.lat], zoom: 15, padding: getMapPadding(isPanelMinimized) });
     }
   };
 
@@ -809,7 +823,7 @@ export default function Home() {
         setOrigin(result);
         setShowOriginSuggestions(false);
         if (map.current) {
-          map.current.flyTo({ center: [result.lon, result.lat], zoom: 15 });
+          map.current.flyTo({ center: [result.lon, result.lat], zoom: 15, padding: getMapPadding(isPanelMinimized) });
         }
       }
     } catch (error) {
@@ -827,7 +841,7 @@ export default function Home() {
         setDestination(result);
         setShowDestSuggestions(false);
         if (map.current) {
-          map.current.flyTo({ center: [result.lon, result.lat], zoom: 15 });
+          map.current.flyTo({ center: [result.lon, result.lat], zoom: 15, padding: getMapPadding(isPanelMinimized) });
         }
       }
     } catch (error) {
@@ -862,7 +876,7 @@ export default function Home() {
         setOriginInput(address);
         
         if (map.current) {
-          map.current.flyTo({ center: [longitude, latitude], zoom: 15 });
+          map.current.flyTo({ center: [longitude, latitude], zoom: 15, padding: getMapPadding(isPanelMinimized) });
         }
       },
       (error) => {
@@ -1303,11 +1317,13 @@ export default function Home() {
                       // Close the panel
                       setIsPanelMinimized(true);
                       // Zoom to user location if available
+                      // Use getMapPadding(true) since panel will be minimized
                       if (userLocation && map.current) {
                         map.current.flyTo({
                           center: [userLocation.lon, userLocation.lat],
                           zoom: 17,
                           duration: 1000,
+                          padding: getMapPadding(true), // Panel will be minimized
                         });
                       } else if (origin && map.current) {
                         // Fallback to origin if no live location
@@ -1315,6 +1331,7 @@ export default function Home() {
                           center: [origin.lon, origin.lat],
                           zoom: 17,
                           duration: 1000,
+                          padding: getMapPadding(true), // Panel will be minimized
                         });
                       }
                     }}
