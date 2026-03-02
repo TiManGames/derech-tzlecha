@@ -571,13 +571,6 @@ body {
   }
 }
 
-/* Shelter markers not near the route - faded */
-.shelter-marker.faded {
-  opacity: 0.35;
-  width: 18px;
-  height: 18px;
-  border-width: 1px;
-}
 
 /* Map popup */
 .maplibregl-popup-content {

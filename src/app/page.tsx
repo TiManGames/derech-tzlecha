@@ -127,6 +127,7 @@ export default function Home() {
   const [isPanelMinimized, setIsPanelMinimized] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
   const [isSosRoute, setIsSosRoute] = useState(false); // Track if current route is from SOS button
+  const [zoomLevel, setZoomLevel] = useState(DEFAULT_ZOOM); // Track zoom level for adaptive marker sizes
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -212,6 +213,13 @@ export default function Home() {
       }
     });
 
+    // Track zoom level for adaptive marker sizes
+    map.current.on('zoom', () => {
+      if (map.current) {
+        setZoomLevel(map.current.getZoom());
+      }
+    });
+
     // Handle map clicks for setting origin/destination
     map.current.on('click', async (e) => {
       const { lng, lat } = e.lngLat;
@@ -255,7 +263,16 @@ export default function Home() {
     loadShelters();
   }, []);
 
-  // Update shelter markers when shelters, filters, or route changes
+  // Calculate marker scale based on zoom level
+  // At zoom 15+: scale 1.0, at zoom 10: scale 0.5, at zoom 8: scale 0.3
+  const getMarkerScale = (zoom: number): number => {
+    if (zoom >= 15) return 1.0;
+    if (zoom <= 8) return 0.3;
+    // Linear interpolation between zoom 8 and 15
+    return 0.3 + (zoom - 8) * (0.7 / 7);
+  };
+
+  // Update shelter markers when shelters, filters, route, or zoom changes
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
@@ -271,19 +288,28 @@ export default function Home() {
       safestRoute?.nearbyShelters?.map(s => s.id) || []
     );
 
+    // Calculate scale based on current zoom
+    const scale = getMarkerScale(zoomLevel);
+
     // Add markers for filtered shelters
     filteredShelters.forEach(shelter => {
+      // Check if this shelter is near the route
+      const isNearRoute = nearbyShelterIds.has(shelter.id);
+      
+      // If there's a route and this shelter is NOT near it, skip it entirely
+      if (safestRoute && !isNearRoute) {
+        return; // Don't create marker for non-route shelters when route exists
+      }
+
       const el = document.createElement('div');
       el.className = 'shelter-marker';
       el.style.backgroundColor = getShelterColor(shelter.type);
       
-      // Check if this shelter is near the route
-      const isNearRoute = nearbyShelterIds.has(shelter.id);
+      // Apply adaptive scale based on zoom level
+      el.style.transform = `scale(${scale})`;
+      
       if (isNearRoute) {
         el.classList.add('near-route');
-      } else if (safestRoute) {
-        // If there's a route but this shelter is not near it, fade it
-        el.classList.add('faded');
       }
       
       // Add wheelchair icon for accessible shelters
@@ -292,7 +318,7 @@ export default function Home() {
         el.classList.add('accessible');
       }
 
-      const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+      const popup = new maplibregl.Popup({ offset: 25 * scale }).setHTML(`
         <div class="popup-title">${getShelterTypeLabel(shelter.type)}</div>
         <div class="popup-address">${shelter.address}</div>
         ${shelter.isAccessible ? '<span class="popup-type">♿ נגיש</span>' : ''}
@@ -330,7 +356,7 @@ export default function Home() {
 
       markersRef.current.push(marker);
     });
-  }, [shelters, filters, mapReady, safestRoute]);
+  }, [shelters, filters, mapReady, safestRoute, zoomLevel]);
 
   // Update origin marker
   useEffect(() => {
