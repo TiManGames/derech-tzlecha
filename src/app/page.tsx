@@ -88,6 +88,10 @@ export default function Home() {
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasInitialCenterRef = useRef(false);
   const hasAutoFilledOriginRef = useRef(false); // Track if origin was auto-filled on load
+  
+  // Compass heading state
+  const [compassPermissionNeeded, setCompassPermissionNeeded] = useState(false);
+  const lastHeadingRef = useRef<number | null>(null); // For smoothing
 
   // App state
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -461,16 +465,12 @@ export default function Home() {
     // Start watching position
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, accuracy, heading } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
         
         // Only update location if accuracy is good enough
         if (accuracy <= MAX_ACCURACY_THRESHOLD) {
           setUserLocation({ lat: latitude, lon: longitude, accuracy });
-          
-          // Update heading if available (typically only on mobile when moving)
-          if (heading !== null && !isNaN(heading)) {
-            setUserHeading(heading);
-          }
+          // Note: We no longer use GPS heading here - compass heading comes from DeviceOrientationEvent
         } else {
           // If accuracy is poor, clear the location marker
           console.log(`Location accuracy too low: ${accuracy}m (threshold: ${MAX_ACCURACY_THRESHOLD}m)`);
@@ -495,6 +495,120 @@ export default function Home() {
       }
     };
   }, [mapReady]);
+
+  // Compass heading from DeviceOrientationEvent (more reliable than GPS heading)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Smoothing function to reduce compass jitter
+    const smoothHeading = (newHeading: number): number => {
+      const lastHeading = lastHeadingRef.current;
+      if (lastHeading === null) {
+        lastHeadingRef.current = newHeading;
+        return newHeading;
+      }
+      
+      // Calculate the shortest angular distance
+      let diff = newHeading - lastHeading;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      
+      // Apply exponential smoothing (0.3 = more smoothing, 0.7 = less smoothing)
+      const smoothingFactor = 0.3;
+      let smoothed = lastHeading + diff * smoothingFactor;
+      
+      // Normalize to 0-360
+      if (smoothed < 0) smoothed += 360;
+      if (smoothed >= 360) smoothed -= 360;
+      
+      lastHeadingRef.current = smoothed;
+      return smoothed;
+    };
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      let heading: number | null = null;
+      
+      // iOS provides webkitCompassHeading (more accurate, already calibrated)
+      // It gives the compass heading where 0 = North
+      if ('webkitCompassHeading' in event && (event as any).webkitCompassHeading !== null) {
+        heading = (event as any).webkitCompassHeading as number;
+      } else if (event.alpha !== null) {
+        // Android/others - alpha is the rotation around z-axis
+        // alpha = 0 when device points in the same direction as during initialization
+        // For compass heading: when alpha = 0, device points North
+        // But alpha increases counter-clockwise, so we need to invert it
+        heading = (360 - event.alpha) % 360;
+      }
+      
+      if (heading !== null && !isNaN(heading) && isFinite(heading)) {
+        const smoothedHeading = smoothHeading(heading);
+        setUserHeading(smoothedHeading);
+      }
+    };
+
+    // Check if we need to request permission (iOS 13+)
+    const DeviceOrientationEventTyped = DeviceOrientationEvent as any;
+    if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
+      // iOS 13+ - need to request permission
+      // This must be triggered by a user gesture, so we'll set a flag
+      setCompassPermissionNeeded(true);
+    } else {
+      // Non-iOS or older iOS - just add listener directly
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+    };
+  }, []);
+
+  // Function to request compass permission (iOS)
+  const requestCompassPermission = async () => {
+    const DeviceOrientationEventTyped = DeviceOrientationEvent as any;
+    if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
+      try {
+        const permission = await DeviceOrientationEventTyped.requestPermission();
+        if (permission === 'granted') {
+          setCompassPermissionNeeded(false);
+          
+          // Smoothing function (duplicated here for the permission flow)
+          const smoothHeading = (newHeading: number): number => {
+            const lastHeading = lastHeadingRef.current;
+            if (lastHeading === null) {
+              lastHeadingRef.current = newHeading;
+              return newHeading;
+            }
+            let diff = newHeading - lastHeading;
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            const smoothingFactor = 0.3;
+            let smoothed = lastHeading + diff * smoothingFactor;
+            if (smoothed < 0) smoothed += 360;
+            if (smoothed >= 360) smoothed -= 360;
+            lastHeadingRef.current = smoothed;
+            return smoothed;
+          };
+
+          const handleOrientation = (event: DeviceOrientationEvent) => {
+            let heading: number | null = null;
+            if ('webkitCompassHeading' in event && (event as any).webkitCompassHeading !== null) {
+              heading = (event as any).webkitCompassHeading as number;
+            } else if (event.alpha !== null) {
+              heading = (360 - event.alpha) % 360;
+            }
+            if (heading !== null && !isNaN(heading) && isFinite(heading)) {
+              const smoothedHeading = smoothHeading(heading);
+              setUserHeading(smoothedHeading);
+            }
+          };
+
+          window.addEventListener('deviceorientation', handleOrientation, true);
+        }
+      } catch (error) {
+        console.error('Compass permission denied:', error);
+      }
+    }
+  };
 
   // Update user location marker and accuracy circle
   useEffect(() => {
@@ -891,6 +1005,17 @@ export default function Home() {
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
         </svg>
       </button>
+
+      {/* Compass permission button (iOS only) */}
+      {compassPermissionNeeded && (
+        <button
+          className="compass-permission-btn"
+          onClick={requestCompassPermission}
+          title="אפשר גישה למצפן"
+        >
+          🧭 אפשר מצפן
+        </button>
+      )}
 
       {/* SOS Button - Find nearest shelter */}
       <button

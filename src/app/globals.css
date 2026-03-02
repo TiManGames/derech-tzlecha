@@ -673,6 +673,36 @@ body {
   }
 }
 
+/* Compass permission button (iOS) */
+.compass-permission-btn {
+  position: absolute;
+  bottom: 170px;
+  left: 16px;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  z-index: 1000;
+  transition: all 0.2s ease;
+}
+
+.compass-permission-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+  .compass-permission-btn {
+    bottom: calc(55vh + 66px);
+    transition: bottom 0.3s ease;
+  }
+}
+
 /* SOS Button */
 .sos-btn {
   position: absolute;
