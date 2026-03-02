@@ -114,7 +114,8 @@ export function scoreAndRankRoutes(
       spatialIndex
     );
 
-    const nearbyShelters = spatialIndex.getSheltersNearRoute(geometry, 150);
+    // Use adaptive radius: prefer 150m, fallback to nearest within 1km
+    const nearbyShelters = spatialIndex.getSheltersNearRouteAdaptive(geometry, 150, 1000, 50);
 
     return {
       geometry,

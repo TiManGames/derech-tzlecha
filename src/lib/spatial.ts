@@ -99,6 +99,7 @@ export class ShelterSpatialIndex {
 
   /**
    * Get all shelters within a corridor around a route
+   * @deprecated Use getSheltersNearRouteAdaptive for better coverage
    */
   getSheltersNearRoute(geometry: GeoJSON.LineString, corridorMeters: number): Shelter[] {
     // Get bounding box of the route with buffer
@@ -122,6 +123,102 @@ export class ShelterSpatialIndex {
         return distance <= corridorMeters;
       })
       .map(c => c.shelter);
+  }
+
+  /**
+   * Get shelters near route with adaptive radius
+   * 
+   * Algorithm:
+   * 1. Sample points along the route every 50m
+   * 2. For each sample point:
+   *    - If shelters exist within preferredRadius (150m), include them
+   *    - If no shelters within preferredRadius, find and include the nearest shelter
+   *      (up to maxFallbackRadius of 1km)
+   * 3. Deduplicate the final list
+   * 
+   * This ensures every point along the route has at least one reachable shelter,
+   * while not cluttering with distant shelters when closer ones exist.
+   */
+  getSheltersNearRouteAdaptive(
+    geometry: GeoJSON.LineString,
+    preferredRadiusMeters: number = 150,
+    maxFallbackRadiusMeters: number = 1000,
+    sampleIntervalMeters: number = 50
+  ): Shelter[] {
+    const line = turf.lineString(geometry.coordinates);
+    const lengthKm = turf.length(line, { units: 'kilometers' });
+    const lengthMeters = lengthKm * 1000;
+    
+    // Calculate number of sample points (at least 2: start and end)
+    const sampleCount = Math.max(2, Math.ceil(lengthMeters / sampleIntervalMeters) + 1);
+    
+    // Use a Set to track unique shelter IDs
+    const includedShelterIds = new Set<string>();
+    const result: Shelter[] = [];
+    
+    // Sample points along the route
+    for (let i = 0; i < sampleCount; i++) {
+      const fraction = i / (sampleCount - 1);
+      const distanceKm = lengthKm * fraction;
+      const point = turf.along(line, distanceKm, { units: 'kilometers' });
+      const [lon, lat] = point.geometry.coordinates;
+      
+      // First, try to find shelters within preferred radius
+      const sheltersInPreferred = this.getSheltersWithinRadius(lat, lon, preferredRadiusMeters);
+      
+      if (sheltersInPreferred.length > 0) {
+        // Found shelters within preferred radius - add them
+        for (const shelter of sheltersInPreferred) {
+          if (!includedShelterIds.has(shelter.id)) {
+            includedShelterIds.add(shelter.id);
+            result.push(shelter);
+          }
+        }
+      } else {
+        // No shelters within preferred radius - find the nearest one
+        const nearest = this.getNearestShelterWithinRadius(lat, lon, maxFallbackRadiusMeters);
+        if (nearest && !includedShelterIds.has(nearest.id)) {
+          includedShelterIds.add(nearest.id);
+          result.push(nearest);
+        }
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Get the nearest shelter within a maximum radius
+   * Returns null if no shelter found within the radius
+   */
+  private getNearestShelterWithinRadius(lat: number, lon: number, maxRadiusMeters: number): Shelter | null {
+    // Convert meters to approximate degrees
+    const radiusDegrees = maxRadiusMeters / 111000;
+    
+    const candidates = this.tree.search({
+      minX: lon - radiusDegrees,
+      minY: lat - radiusDegrees,
+      maxX: lon + radiusDegrees,
+      maxY: lat + radiusDegrees
+    });
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    // Find the actual nearest among candidates
+    let nearest: Shelter | null = null;
+    let minDist = Infinity;
+
+    for (const candidate of candidates) {
+      const dist = this.haversineDistance(lat, lon, candidate.shelter.lat, candidate.shelter.lon);
+      if (dist <= maxRadiusMeters && dist < minDist) {
+        minDist = dist;
+        nearest = candidate.shelter;
+      }
+    }
+
+    return nearest;
   }
 
   /**

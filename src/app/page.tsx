@@ -27,6 +27,31 @@ const MAX_ACCURACY_CIRCLE_RADIUS = 100; // Cap the accuracy circle at 100 meters
 const MOBILE_PANEL_HEIGHT_PERCENT = 0.55;
 const MOBILE_BREAKPOINT = 768;
 
+// Marker size configuration for zoom-adaptive sizing
+const MARKER_BASE_ZOOM = 15;
+const MARKER_BASE_SIZE = 20; // Base size at zoom 15
+const MARKER_MIN_SIZE = 6;
+const MARKER_MAX_SIZE = 28;
+const MARKER_NEAR_ROUTE_MULTIPLIER = 1.4; // Near-route markers are 40% larger
+
+// Calculate marker size based on zoom level
+function calculateMarkerSize(zoom: number, isNearRoute: boolean = false): number {
+  // Scale factor: ~1.15x per zoom level
+  const scaleFactor = Math.pow(1.15, zoom - MARKER_BASE_ZOOM);
+  let size = MARKER_BASE_SIZE * scaleFactor;
+  
+  // Apply near-route multiplier
+  if (isNearRoute) {
+    size *= MARKER_NEAR_ROUTE_MULTIPLIER;
+  }
+  
+  // Clamp to min/max
+  const minSize = isNearRoute ? MARKER_MIN_SIZE * MARKER_NEAR_ROUTE_MULTIPLIER : MARKER_MIN_SIZE;
+  const maxSize = isNearRoute ? MARKER_MAX_SIZE * MARKER_NEAR_ROUTE_MULTIPLIER : MARKER_MAX_SIZE;
+  
+  return Math.max(minSize, Math.min(maxSize, Math.round(size)));
+}
+
 // Helper function to get map padding based on panel state
 function getMapPadding(isPanelMinimized: boolean): maplibregl.PaddingOptions {
   // Only apply padding on mobile when panel is open
@@ -146,6 +171,10 @@ export default function Home() {
   const [isPanelMinimized, setIsPanelMinimized] = useState(false);
   const [sosLoading, setSosLoading] = useState(false);
   const [isSosRoute, setIsSosRoute] = useState(false); // Track if current route is from SOS button
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM); // Track zoom for adaptive marker sizing
+  
+  // Store marker elements for zoom-based resizing (separate from maplibregl.Marker refs)
+  const markerElementsRef = useRef<Map<string, { element: HTMLDivElement; isNearRoute: boolean }>>(new Map());
 
   // Use refs to track current state for map click handler
   const originRef = useRef<RoutePoint | null>(null);
@@ -231,6 +260,13 @@ export default function Home() {
       }
     });
 
+    // Track zoom for adaptive marker sizing
+    map.current.on('zoom', () => {
+      if (map.current) {
+        setMapZoom(map.current.getZoom());
+      }
+    });
+
     // Handle map clicks for setting origin/destination
     map.current.on('click', async (e) => {
       const { lng, lat } = e.lngLat;
@@ -278,9 +314,10 @@ export default function Home() {
   useEffect(() => {
     if (!map.current || !mapReady) return;
 
-    // Clear existing markers
+    // Clear existing markers and element refs
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
+    markerElementsRef.current.clear();
 
     // Filter shelters
     const filteredShelters = filterShelters(shelters, filters);
@@ -289,6 +326,9 @@ export default function Home() {
     const nearbyShelterIds = new Set<string>(
       safestRoute?.nearbyShelters?.map(s => s.id) || []
     );
+
+    // Get current zoom for initial marker sizing
+    const currentZoom = map.current.getZoom();
 
     // Add markers for filtered shelters
     filteredShelters.forEach(shelter => {
@@ -304,6 +344,14 @@ export default function Home() {
         // If there's a route but this shelter is not near it, fade it
         el.classList.add('faded');
       }
+      
+      // Set initial size based on current zoom
+      const size = calculateMarkerSize(currentZoom, isNearRoute);
+      el.style.width = `${size}px`;
+      el.style.height = `${size}px`;
+      
+      // Store reference for zoom-based resizing
+      markerElementsRef.current.set(shelter.id, { element: el, isNearRoute });
       
       // Add wheelchair icon for accessible shelters
       if (shelter.isAccessible) {
@@ -478,6 +526,15 @@ export default function Home() {
       panelContentRef.current.scrollTop = 0;
     }
   }, [isPanelMinimized]);
+
+  // Update shelter marker sizes when zoom changes
+  useEffect(() => {
+    markerElementsRef.current.forEach(({ element, isNearRoute }) => {
+      const size = calculateMarkerSize(mapZoom, isNearRoute);
+      element.style.width = `${size}px`;
+      element.style.height = `${size}px`;
+    });
+  }, [mapZoom]);
 
   // Start live location tracking when map is ready
   useEffect(() => {
